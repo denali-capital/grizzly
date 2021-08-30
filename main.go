@@ -1,9 +1,6 @@
-type Exchange interface {
-    // functionality we want each exchange to implement
-    // * getting data
-    // * executing orders
-    // * checking status of orders
-}
+package main
+
+import _ "github.com/denali-capital/grizzly/types"
 
 // each exchange will have their own module that implements Exchange interface above
 // can have module to compute statistics in background and access them
