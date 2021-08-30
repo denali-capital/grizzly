@@ -33,22 +33,31 @@ type Order struct {
 type OrderId uint
 
 type OrderStatus struct {
-    filled   bool
-    price    *float64
-    quantity *float64
+    filled         bool
+    filledPrice    *float64
+    filledQuantity *float64
+    original       *Order
+}
+
+type OrderBook struct {
+    bids []OrderBookEntry
+    asks []OrderBookEntry
+}
+
+type OrderBookEntry struct {
+    price    float64
+    quantity float64
 }
 
 type Exchange interface {
-    // functionality we want each exchange to implement
+    // get data
+    GetHistoricalSpreads(symbol []Symbol, seconds time.Duration) map[Symbol][]Spread
+    GetCurrentSpread(symbol []Symbol) map[Symbol]Spread
+    GetOrderBook(symbol []Symbol) map[Symbol]OrderBook
 
-    // * getting data
-    GetHistoricalSpreads(symbol []Symbol, seconds time.Duration) [][]Spread
-    GetCurrentSpread(symbol []Symbol) []Spread
     GetLatency() time.Duration
-    // get data for liquidity measurements
-    // look into liquidity calculations
 
-    // * executing and checking status of orders
+    // deal with orders
     ExecuteOrders(orders []Order) []OrderId
     GetOrderStatuses(orderIds []OrderId) map[OrderId]OrderStatus
     CancelOrders(orderIds []OrderId)
