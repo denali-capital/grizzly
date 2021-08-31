@@ -3,9 +3,9 @@ package types
 import "time"
 
 type Spread struct {
-    bid       uint
-    ask       uint
-    timestamp time.Time
+    Bid       float64
+    Ask       float64
+    Timestamp time.Time
 }
 
 type OrderType uint
@@ -24,29 +24,29 @@ type Symbol struct {
 }
 
 type Order struct {
-    orderType OrderType
-    symbol    Symbol
-    price     float64
-    quantity  float64
+    OrderType OrderType
+    Symbol    Symbol
+    Price     float64
+    Quantity  float64
 }
 
 type OrderId uint
 
 type OrderStatus struct {
-    filled         bool
-    filledPrice    *float64
-    filledQuantity *float64
-    original       *Order
+    Filled         bool
+    FilledPrice    *float64
+    FilledQuantity *float64
+    Original       *Order
 }
 
 type OrderBook struct {
-    bids []OrderBookEntry
-    asks []OrderBookEntry
+    Bids []OrderBookEntry
+    Asks []OrderBookEntry
 }
 
 type OrderBookEntry struct {
-    price    float64
-    quantity float64
+    Price    float64
+    Quantity float64
 }
 
 type Exchange interface {
