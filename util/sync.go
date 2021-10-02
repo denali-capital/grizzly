@@ -19,19 +19,19 @@ func NewConcurrentOrderIdToOrderPtrMap() *ConcurrentOrderIdToOrderPtrMap {
 
 func (c *ConcurrentOrderIdToOrderPtrMap) Load(key types.OrderId) (value *types.Order, ok bool) {
 	c.RLock()
+	defer c.RUnlock()
 	result, ok := c.internal[key]
-	c.RUnlock()
 	return result, ok
 }
 
 func (c *ConcurrentOrderIdToOrderPtrMap) Delete(key types.OrderId) {
 	c.Lock()
+	defer c.Unlock()
 	delete(c.internal, key)
-	c.Unlock()
 }
 
 func (c *ConcurrentOrderIdToOrderPtrMap) Store(key types.OrderId, value *types.Order) {
 	c.Lock()
+	defer c.Unlock()
 	c.internal[key] = value
-	c.Unlock()
 }

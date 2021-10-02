@@ -29,7 +29,19 @@ func ParseUrlWithQuery(urlString string, values url.Values) string {
 }
 
 func HttpGetAndGetBody(httpClient *http.Client, urlString string) map[string]interface{} {
-	resp, err := httpClient.Get(urlString)
+	var resp *http.Response
+	var err error
+	if httpClient != nil {
+		resp, err = httpClient.Get(urlString)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	} else {
+		resp, err = http.Get(urlString)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -47,6 +59,9 @@ func HttpGetAndGetBody(httpClient *http.Client, urlString string) map[string]int
 
 func DoHttpAndGetBody(httpClient *http.Client, request *http.Request) map[string]interface{} {
 	resp, err := httpClient.Do(request)
+	if err != nil {
+		log.Fatalln(err)
+	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -56,6 +71,7 @@ func DoHttpAndGetBody(httpClient *http.Client, request *http.Request) map[string
 	var bodyJson map[string]interface{}
 	err = json.Unmarshal(body, &bodyJson)
 	if err != nil {
+		log.Println(string(body))
 		log.Fatalln(err)
 	}
 
