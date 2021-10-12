@@ -3,6 +3,7 @@ package exchanges
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -246,15 +247,13 @@ func (b *BinanceUS) executeOrder(order types.Order, channel chan types.OrderIdRe
 		"quantity": []string{strconv.FormatFloat(order.Quantity, 'f', -1, 64)},
 		"timestamp": []string{strconv.FormatInt(time.Now().UnixMilli(), 10)},
 	}
-	request, err := http.NewRequest("POST", BinanceUSEndpoint + "/api/v3/order", strings.NewReader(queryParams.Encode()))
+
+	signature := b.getBinanceUSSignature(queryParams)
+
+	request, err := http.NewRequest("POST", util.ParseUrlWithQuery(BinanceUSEndpoint + "/api/v3/order", queryParams) + "&signature=" + signature, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	signature := b.getBinanceUSSignature(queryParams)
-	queryParams.Add("signature", signature)
-	request.Body = ioutil.NopCloser(strings.NewReader(queryParams.Encode()))
-	request.ContentLength = int64(len(queryParams.Encode()))
 	request.Header.Set("X-MBX-APIKEY", b.apiKey)
 
 	bodyJson := util.DoHttpAndGetBody(b.httpClient, request)
@@ -291,15 +290,13 @@ func (b *BinanceUS) getOrderStatus(orderId types.OrderId, channel chan types.Ord
 		"orderId": []string{string(orderId)},
 		"timestamp": []string{strconv.FormatInt(time.Now().UnixMilli(), 10)},
 	}
-	request, err := http.NewRequest("GET", BinanceUSEndpoint + "/api/v3/order", strings.NewReader(queryParams.Encode()))
+
+	signature := b.getBinanceUSSignature(queryParams)
+
+	request, err := http.NewRequest("GET", util.ParseUrlWithQuery(BinanceUSEndpoint + "/api/v3/order", queryParams) + "&signature=" + signature, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	signature := b.getBinanceUSSignature(queryParams)
-	queryParams.Add("signature", signature)
-	request.Body = ioutil.NopCloser(strings.NewReader(queryParams.Encode()))
-	request.ContentLength = int64(len(queryParams.Encode()))
 	request.Header.Set("X-MBX-APIKEY", b.apiKey)
 
 	bodyJson := util.DoHttpAndGetBody(b.httpClient, request)
@@ -374,15 +371,13 @@ func (b *BinanceUS) cancelOrder(orderId types.OrderId) {
 		"orderId": []string{string(orderId)},
 		"timestamp": []string{strconv.FormatInt(time.Now().UnixMilli(), 10)},
 	}
-	request, err := http.NewRequest("DELETE", BinanceUSEndpoint + "/api/v3/order", strings.NewReader(queryParams.Encode()))
+
+	signature := b.getBinanceUSSignature(queryParams)
+
+	request, err := http.NewRequest("DELETE", util.ParseUrlWithQuery(BinanceUSEndpoint + "/api/v3/order", queryParams) + "&signature=" + signature, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	signature := b.getBinanceUSSignature(queryParams)
-	queryParams.Add("signature", signature)
-	request.Body = ioutil.NopCloser(strings.NewReader(queryParams.Encode()))
-	request.ContentLength = int64(len(queryParams.Encode()))
 	request.Header.Set("X-MBX-APIKEY", b.apiKey)
 
 	bodyJson := util.DoHttpAndGetBody(b.httpClient, request)
@@ -401,22 +396,24 @@ func (b *BinanceUS) GetBalances() map[types.Asset]float64 {
 	queryParams := url.Values{
 		"timestamp": []string{strconv.FormatInt(time.Now().UnixMilli(), 10)},
 	}
-	request, err := http.NewRequest("GET", BinanceUSEndpoint + "/api/v3/account", strings.NewReader(queryParams.Encode()))
+
+	signature := b.getBinanceUSSignature(queryParams)
+
+	request, err := http.NewRequest("GET", util.ParseUrlWithQuery(BinanceUSEndpoint + "/api/v3/account", queryParams) + "&signature=" + signature, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	signature := b.getBinanceUSSignature(queryParams)
-	queryParams.Add("signature", signature)
-	request.Body = ioutil.NopCloser(strings.NewReader(queryParams.Encode()))
-	request.ContentLength = int64(len(queryParams.Encode()))
 	request.Header.Set("X-MBX-APIKEY", b.apiKey)
+
+	dump, _ := httputil.DumpRequest(request, true)
+	fmt.Println(string(dump))
 
 	bodyJson := util.DoHttpAndGetBody(b.httpClient, request)
 	b.checkError(bodyJson)
 
 	balances := make(map[types.Asset]float64)
-	for _, data := range bodyJson["balances"].([]map[string]string) {
+	for _, rawData := range bodyJson["balances"].([]interface{}) {
+		data := rawData.(map[string]string)
 		free, err := strconv.ParseFloat(data["free"], 64)
 		if err != nil {
 			log.Fatalln(err)
