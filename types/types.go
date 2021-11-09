@@ -74,3 +74,16 @@ type Exchange interface {
     // * getting account info
     GetBalances() map[Asset]float64
 }
+
+type Observation struct {
+    PriceDelta  float64
+    Liquidity1  float64
+    Liquidity2  float64
+    Latency1    float64
+    Latency2    float64
+    Volatility1 float64
+    Volatility2 float64
+
+    // optional
+    Label       int32
+}
