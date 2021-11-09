@@ -29,7 +29,7 @@ class KillerInstinct(tf.Module):
                     shape=(1, self.num_features),
                     batch_size=self.batch_size
                 ),
-                k.layers.Dense(4),
+                k.layers.Dense(4, activation='relu'),
                 k.layers.Dense(1, activation='sigmoid')
             ]
         )
@@ -38,10 +38,32 @@ class KillerInstinct(tf.Module):
         self._optimizer = k.optimizers.Adam()
         self._loss = k.losses.BinaryCrossEntropy()
 
-    @tf.function
-    def learn():
-        pass
+    @tf.function(
+        input_signature=[
+            tf.TensorSpec(shape=(None, 1, self.num_features), dtype=tf.float32),
+            tf.TensorSpec(shape=(None), dtype=tf.int32)
+        ]
+    )
+    def learn(self, data, labels):
+        self._global_step.assign_add(1)
+        with tf.GradientTape() as tape:
+            loss = self._loss(labels, self._model(data))
+            tf.print(self._global_step, ": loss: ", loss)
 
-    @tf.function
-    def predict():
-        pass
+        gradient = tape.gradient(loss, self._model.trainable_variables)
+        self._optimizer.apply_gradients(zip(gradient, self._model.trainable_variables))
+        return {
+            'loss': loss
+        }
+
+    @tf.function(
+        input_signature=[
+            tf.TensorSpec(shape=(None, 1, self.num_features), dtype=tf.float32),
+        ]
+    )
+    def predict(self, data):
+        predictions = self._model(data)
+        predicted = tf.cast(tf.round(predictions), tf.int32)
+        return {
+            'predictions': predicted
+        }
