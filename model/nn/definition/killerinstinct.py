@@ -27,7 +27,10 @@ class KillerInstinct(tf.Module):
         # how to do batch_size while allowing inference with only 1 at a time
         self._model = k.Sequential(
             [
-                k.layers.Input(shape=(self.num_features,)),
+                k.layers.Input(
+                    shape=(self.num_features,),
+                    batch_size=self.batch_size
+                ),
                 k.layers.Dense(4, activation='relu'),
                 k.layers.Dense(1, activation='sigmoid')
             ]
