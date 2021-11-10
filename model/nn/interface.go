@@ -8,6 +8,16 @@ import (
 	tf "github.com/tensorflow/tensorflow/tensorflow/go"
 )
 
+type KillerInstinct struct {
+	model *tg.Model
+}
+
+func NewKillerInstinct() *KillerInstinct {
+	return &KillerInstinct{
+		model: tg.LoadModel("KillerInstinct", []string{"serve"}, nil)
+	}
+}
+
 func learn(model *tg.Model, data *tf.Tensor, labels *tf.Tensor) float32 {
 	loss := model.Exec(
 		[]tf.Output{
@@ -22,7 +32,7 @@ func learn(model *tg.Model, data *tf.Tensor, labels *tf.Tensor) float32 {
 	return loss.Value().(float32)
 }
 
-func Learn(model *tg.Model, observations []types.Observation) float32 {
+func (k *KillerInstinct) Learn(observations []types.Observation) float32 {
 	size := len(observations)
 	var data [size][1][7]float32
 	var labels [size]int32
@@ -53,7 +63,7 @@ func Learn(model *tg.Model, observations []types.Observation) float32 {
 		log.Fatalln(err)
 	}
 
-	return learn(model, dataTensor, labelTensor)
+	return learn(k.model, dataTensor, labelTensor)
 }
 
 func predict(model *tg.Model, data *tf.Tensor) []float32 {
@@ -74,7 +84,7 @@ func predict(model *tg.Model, data *tf.Tensor) []float32 {
 	return predictions
 }
 
-func Predict(model *tg.Model, observations []types.Observation) []float32 {
+func (k *KillerInstinct) Predict(observations []types.Observation) []float32 {
 	size := len(observations)
 	var data [size][1][7]float32
 
@@ -95,5 +105,5 @@ func Predict(model *tg.Model, observations []types.Observation) []float32 {
 		log.Fatalln(err)
 	}
 
-	return predict(model, dataTensor)
+	return predict(k.model, dataTensor)
 }

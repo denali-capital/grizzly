@@ -23,3 +23,9 @@ type OrderStatusResponse struct {
 	OrderId     OrderId
 	OrderStatus OrderStatus
 }
+
+// pointerize?
+type PredictionResponse struct {
+	Index 		uint
+	Prediction  float32
+}
