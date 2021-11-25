@@ -1,9 +1,9 @@
 exchange,api_key,comment
-BinanceUS,UYx1if8j8xamcmLmVvgOQo3ODpRypASl0BvBbpoCuGRk3p8IXUYKQn8Wrp7nSc2u,na
-Kraken,R/5UQB4rwqn3JGHwLWQpWhf9rVwdMa4CnjTWWPceAwPYvcRhZ4wq1IcP,na
-KuCoin,na,na
-LBank,na,na
-HitBTC,na,high frequency trading
-OKEx,na,no us
-FTX,na,na
-Bitbank,na,no us
+BinceUS,UYx1if8j8xamcmLmVvgOQo3ODpRypASl0BvBbpoCuGRk3p8IXUYKQn8Wrp7nSc2u,
+Kraken,R/5UQB4rwqn3JGHwLWQpWhf9rVwdMa4CnjTWWPceAwPYvcRhZ4wq1IcP,
+KuCoin,,
+LBank,,
+HitBTC,,high frequency trading
+OKEx,,no us
+FTX,,
+Bitbank,,no us

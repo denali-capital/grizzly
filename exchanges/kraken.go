@@ -21,7 +21,7 @@ import (
 const KrakenEndpoint string = "https://api.kraken.com"
 
 type Kraken struct {
-	AssetPairTranslator      map[types.AssetPair]string
+	AssetPairTranslator      types.AssetPairTranslator
 
     apiKey                   string
 	secretKey                string
@@ -31,7 +31,7 @@ type Kraken struct {
 	httpClient               *http.Client
 }
 
-func NewKraken(apiKey, secretKey string, assetPairTranslator map[types.AssetPair]string) *Kraken {
+func NewKraken(apiKey, secretKey string, assetPairTranslator types.AssetPairTranslator) *Kraken {
 	return &Kraken{
 		AssetPairTranslator: assetPairTranslator,
 		apiKey: apiKey,

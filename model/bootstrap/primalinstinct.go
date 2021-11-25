@@ -5,7 +5,7 @@ import (
 )
 
 func primalInstinct(i uint, observation type.Observation, channel chan types.PredictionResponse) float32 {
-	
+	// implement logistic regression for probabilities
 }
 
 func Predict(observations []types.Observation) []float32 {

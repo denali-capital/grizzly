@@ -19,6 +19,8 @@ type Asset string
 
 type AssetPair uint
 
+type AssetPairTranslator map[AssetPair]string
+
 type Order struct {
     OrderType OrderType
     AssetPair AssetPair

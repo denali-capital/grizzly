@@ -21,7 +21,7 @@ import (
 const BinanceUSEndpoint string = "https://api.binance.us"
 
 type BinanceUS struct {
-	AssetPairTranslator      map[types.AssetPair]string
+	AssetPairTranslator      types.AssetPairTranslator
 
     apiKey                   string
 	secretKey                string
@@ -32,7 +32,7 @@ type BinanceUS struct {
 	httpClient               *http.Client
 }
 
-func NewBinanceUS(apiKey, secretKey string, assetPairTranslator map[types.AssetPair]string) *BinanceUS {
+func NewBinanceUS(apiKey, secretKey string, assetPairTranslator types.AssetPairTranslator) *BinanceUS {
 	assetPairs := make([]types.AssetPair, len(assetPairTranslator))
 	i := 0
 	for assetPair := range assetPairTranslator {
