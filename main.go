@@ -39,7 +39,7 @@ func main() {
 		}
 	}
 
-	assetPairsList := util.ReadCsvFile(configPath + "/assetPairs.csv")
+	assetPairsList := util.ReadCsvFile(configPath + "/assetpairs.csv")
 	if assetPairsList[0] != "canonical" {
 		log.Fatalln("Labels must be \"canonical,...\"")
 	}
