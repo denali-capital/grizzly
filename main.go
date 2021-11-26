@@ -2,9 +2,13 @@ package main
 
 import (
 	"log"
+	"os"
+	"strings"
 
 	"github.com/denali-capital/grizzly/exchanges"
+	"github.com/denali-capital/grizzly/types"
 	"github.com/denali-capital/grizzly/util"
+	"github.com/joho/godotenv"
 )
 
 // each exchange will have their own module that implements Exchange interface above
@@ -12,6 +16,7 @@ import (
 // Neural network module that handles predict / fit functionality
 
 const configPath string = "config"
+const secretKeySuffix string = "_SECRET_KEY"
 
 func main() {
 	// need to create array of exchange objects
@@ -20,7 +25,7 @@ func main() {
 	implementedExchanges := util.DiscoverTypes("github.com/denali-capital/grizzly/exchanges")
 
 	exchangeList := util.ReadCsvFile(configPath + "/exchanges.csv")
-	if exchangeList[0] != "exchange" || exchangeList[1] != "api_key" {
+	if exchangeList[0][0] != "exchange" || exchangeList[0][1] != "api_key" {
 		log.Fatalln("Labels must be \"exchange,api_key,...\"")
 	}
 
@@ -40,19 +45,41 @@ func main() {
 	}
 
 	assetPairsList := util.ReadCsvFile(configPath + "/assetpairs.csv")
-	if assetPairsList[0] != "canonical" {
+	if assetPairsList[0][0] != "canonical" {
 		log.Fatalln("Labels must be \"canonical,...\"")
 	}
 
-	// make map of exchange name to AssetPairTranslators to use below
+	exchangeIndices := make(map[string]uint)
+	assetPairTranslators := make(map[string]types.AssetPairTranslator)
+	for i, exchangeName := range assetPairsList[0][1:] {
+		exchangeIndices[exchangeName] = i + 1
+		assetPairTranslators[exchangeName] := make(types.AssetPairTranslator)
+	}
+
+	zippedAssetPairsList := util.Zip(assetPairsList...)
+	for i, _ := range zippedAssetPairsList[0][1:] {
+		for exchangeName, translator := range assetPairTranslators {
+			translator[i + 1] := zippedAssetPairsList[exchangeIndices[exchangeName]][i + 1]
+		}
+	}
+
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalln("Error loading .env file", err)
+	}
 
 	exchanges := make([]*Exchange, len(allowedExchanges))
 	for i, exchangeName := range allowedExchanges {
+		apiKey := exchangeInfo[exchangeName][1]
+		secretKey := os.Getenv(strings.ToUpper(exchangeName) + secretKeySuffix)
+		if secretKey == "" {
+			log.Fatalln("Secret key not provided for %v", exchangeName)
+		}
 		switch exchangeName {
 		case "BinanceUS":
-			exchanges[i] = exchanges.NewBinanceUS()
+			exchanges[i] = exchanges.NewBinanceUS(apiKey, secretKey, assetPairTranslators["BinanceUS"])
 		case "Kraken":
-			exchanges[i] = exchanges.NewKraken()
+			exchanges[i] = exchanges.NewKraken(apiKey, secretKey, assetPairTranslators["Kraken"])
 		default:
 			log.Fatalln("Exchange implementation not found for %v", exchangeName)
 		}
