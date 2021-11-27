@@ -21,6 +21,18 @@ type AssetPair uint
 
 type AssetPairTranslator map[AssetPair]string
 
+func (a AssetPairTranslator) GetAssetPairs() []AssetPair {
+    keys := make([]AssetPair, len(a))
+
+    i := 0
+    for k := range a {
+        keys[i] = k
+        i++
+    }
+
+    return keys
+}
+
 type Order struct {
     OrderType OrderType
     AssetPair AssetPair

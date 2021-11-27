@@ -30,7 +30,11 @@ func main() {
     }
 
     zippedExchangeList := util.Zip(exchangeList...)
-    allowedExchanges := util.CaseInsensitiveIntersection(implementedExchanges, zippedExchangeList[0][1:], true)
+    allowedExchanges := util.StringIntersection(implementedExchanges, zippedExchangeList[0][1:])
+
+    if len(allowedExchanges) == 0 {
+        log.Fatalln("No exchanges are both implemented and have requisite config info")
+    }
 
     exchangeInfo := make(map[string][]string)
     for i := 1; i < len(exchangeList); i++ {
@@ -56,12 +60,14 @@ func main() {
         assetPairTranslators[exchangeName] := make(types.AssetPairTranslator)
     }
 
+    assetPairCanonicalTranslator := make(map[types.AssetPair]string)
     zippedAssetPairsList := util.Zip(assetPairsList...)
-    for i, _ := range zippedAssetPairsList[0][1:] {
+    for i, assetPairCanonical := range zippedAssetPairsList[0][1:] {
+        assetPairIndices[i + 1] = assetPairCanonical
         for exchangeName, translator := range assetPairTranslators {
-            assetPairName := zippedAssetPairsList[exchangeIndices[exchangeName]][i + 1]
-            if assetPairName != "" {
-                translator[i + 1] = assetPairName
+            assetPairSpecific := zippedAssetPairsList[exchangeIndices[exchangeName]][i + 1]
+            if assetPairSpecific != "" {
+                translator[i + 1] = assetPairSpecific
             }
         }
     }
@@ -74,9 +80,10 @@ func main() {
     exchanges := make([]*Exchange, len(allowedExchanges))
     for i, exchangeName := range allowedExchanges {
         apiKey := exchangeInfo[exchangeName][1]
-        secretKey := os.Getenv(strings.ToUpper(exchangeName) + secretKeySuffix)
+        secretKeyEnvVar := strings.ToUpper(exchangeName) + secretKeySuffix
+        secretKey := os.Getenv(secretKeyEnvVar)
         if secretKey == "" {
-            log.Fatalln("Secret key not provided for %v", exchangeName)
+            log.Fatalln("Secret key not provided for %v (searching for %v)", exchangeName, secretKeyEnvVar)
         }
         switch exchangeName {
         case "BinanceUS":
@@ -89,4 +96,14 @@ func main() {
     }
 
     // run algo
+
+    for exchangePair := range util.ExchangeCombinations(exchanges, 2) {
+        commonAssetPairs := util.AssetPairIntersection(
+            assetPairTranslators[exchangePair[0].String()].GetAssetPairs(),
+            assetPairTranslators[exchangePair[1].String()].GetAssetPairs()
+        )
+
+        // start go routine and predictions here
+        // todo: add reading from fees.csv
+    }
 }
