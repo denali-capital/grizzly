@@ -1,7 +1,7 @@
 package util
 
 import (
-	"encoding/csv"
+    "encoding/csv"
     "fmt"
     "go/importer"
     "log"
@@ -25,9 +25,9 @@ func ReadCsvFile(filePath string) [][]string {
 }
 
 func DiscoverTypes(packageName string) []string {
-	pkg, err := importer.Default().Import(packageName)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	return pkg.Scope().Names()
+    pkg, err := importer.Default().Import(packageName)
+    if err != nil {
+        log.Fatalln(err)
+    }
+    return pkg.Scope().Names()
 }

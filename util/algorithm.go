@@ -1,30 +1,30 @@
 package util
 
 import (
-	"fmt"
-	"strings"
+    "fmt"
+    "strings"
 )
 
 func Zip(slices ...[]int) ([][]int, error) {
-	if len(slices) == 0 {
-		return [][]int{}, nil
-	}
+    if len(slices) == 0 {
+        return [][]int{}, nil
+    }
 
-	length := len(slices[0])
-	for i := 1; i < len(slices); i++ {
-		if len(slices[i]) != length {
-			return nil, fmt.Errorf("zip: arguments must be of same length")
-		}
-	}
+    length := len(slices[0])
+    for i := 1; i < len(slices); i++ {
+        if len(slices[i]) != length {
+            return nil, fmt.Errorf("zip: arguments must be of same length")
+        }
+    }
 
     r := make([][]int, length)
 
     for i, e := range slices[0] {
-    	a := make([]int, len(slices))
-    	a[0] = e
-    	for j := 1; j < len(slices); j++ {
-    		a[j] = slices[j][i]
-    	}
+        a := make([]int, len(slices))
+        a[0] = e
+        for j := 1; j < len(slices); j++ {
+            a[j] = slices[j][i]
+        }
         r[i] = a
     }
 
@@ -41,10 +41,10 @@ func CaseInsensitiveIntersection(a []string, b []string, which bool) []string {
 
     for i := 0; i < b.Len(); i++ {
         if _, found := hash[strings.ToLower(b[i])]; found {
-        	val := a[i]
-        	if which {
-        		val = b[i]
-        	}
+            val := a[i]
+            if which {
+                val = b[i]
+            }
             set = append(set, val)
         }
     }

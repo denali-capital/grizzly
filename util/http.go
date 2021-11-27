@@ -1,79 +1,79 @@
 package util
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"log"
+    "encoding/json"
+    "io/ioutil"
+    "log"
 
-	"net/http"
-	"net/url"
+    "net/http"
+    "net/url"
 )
 
 // return errors with these functions?
 // pointerize these functions?
 func ParseUrlWithQuery(urlString string, values url.Values) string {
-	url, err := url.Parse(urlString)
-	if err != nil {
-		log.Fatalln(err)
-	}
+    url, err := url.Parse(urlString)
+    if err != nil {
+        log.Fatalln(err)
+    }
 
-	queryParams := url.Query()
-	for param, valueArray := range values {
-		for _, value := range valueArray {
-			queryParams.Add(param, value)
-		}
-	}
-	url.RawQuery = queryParams.Encode()
+    queryParams := url.Query()
+    for param, valueArray := range values {
+        for _, value := range valueArray {
+            queryParams.Add(param, value)
+        }
+    }
+    url.RawQuery = queryParams.Encode()
 
-	return url.String()
+    return url.String()
 }
 
 func HttpGetAndGetBody(httpClient *http.Client, urlString string) map[string]interface{} {
-	var resp *http.Response
-	var err error
-	if httpClient != nil {
-		resp, err = httpClient.Get(urlString)
-		if err != nil {
-			log.Fatalln(err)
-		}
-	} else {
-		resp, err = http.Get(urlString)
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalln(err)
-	}
+    var resp *http.Response
+    var err error
+    if httpClient != nil {
+        resp, err = httpClient.Get(urlString)
+        if err != nil {
+            log.Fatalln(err)
+        }
+    } else {
+        resp, err = http.Get(urlString)
+        if err != nil {
+            log.Fatalln(err)
+        }
+    }
+    defer resp.Body.Close()
+    body, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        log.Fatalln(err)
+    }
 
-	var bodyJson map[string]interface{}
-	err = json.Unmarshal(body, &bodyJson)
-	if err != nil {
-		log.Fatalln(err)
-	}
+    var bodyJson map[string]interface{}
+    err = json.Unmarshal(body, &bodyJson)
+    if err != nil {
+        log.Fatalln(err)
+    }
 
-	return bodyJson
+    return bodyJson
 }
 
 func DoHttpAndGetBody(httpClient *http.Client, request *http.Request) map[string]interface{} {
-	resp, err := httpClient.Do(request)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalln(err)
-	}
+    resp, err := httpClient.Do(request)
+    if err != nil {
+        log.Fatalln(err)
+    }
+    defer resp.Body.Close()
+    body, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        log.Fatalln(err)
+    }
 
-	var bodyJson map[string]interface{}
-	err = json.Unmarshal(body, &bodyJson)
-	if err != nil {
-		log.Println(string(body))
-		log.Fatalln(err)
-	}
+    var bodyJson map[string]interface{}
+    err = json.Unmarshal(body, &bodyJson)
+    if err != nil {
+        log.Println(string(body))
+        log.Fatalln(err)
+    }
 
-	return bodyJson
+    return bodyJson
 }
