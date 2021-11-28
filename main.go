@@ -25,8 +25,8 @@ func main() {
     implementedExchanges := util.DiscoverTypes("github.com/denali-capital/grizzly/exchanges")
 
     exchangeList := util.ReadCsvFile(configPath + "/exchanges.csv")
-    if exchangeList[0][0] != "exchange" || exchangeList[0][1] != "api_key" {
-        log.Fatalln("Labels must be \"exchange,api_key,...\"")
+    if exchangeList[0][0] != "exchange" || exchangeList[0][1] != "api_key" || exchangeList[0][2] != "fees" {
+        log.Fatalln("Labels must be \"exchange,api_key,fees,...\"")
     }
 
     zippedExchangeList := util.Zip(exchangeList...)
@@ -44,6 +44,9 @@ func main() {
             if info[1] == "" {
                 log.Fatalln("API key not provided for %v", exchangeName)
             }
+            if info[2] == "" {
+                log.Println("warning: Fees not provided for %v, assuming 0", exchangeName)
+            }
             exchangeInfo[exchangeName] := info
         }
     }
@@ -60,10 +63,10 @@ func main() {
         assetPairTranslators[exchangeName] := make(types.AssetPairTranslator)
     }
 
-    assetPairCanonicalTranslator := make(map[types.AssetPair]string)
+    assetPairCanonicalTranslator := make(types.AssetPairTranslator)
     zippedAssetPairsList := util.Zip(assetPairsList...)
     for i, assetPairCanonical := range zippedAssetPairsList[0][1:] {
-        assetPairIndices[i + 1] = assetPairCanonical
+        assetPairCanonicalTranslator[i + 1] = assetPairCanonical
         for exchangeName, translator := range assetPairTranslators {
             assetPairSpecific := zippedAssetPairsList[exchangeIndices[exchangeName]][i + 1]
             if assetPairSpecific != "" {
@@ -103,7 +106,6 @@ func main() {
             assetPairTranslators[exchangePair[1].String()].GetAssetPairs()
         )
 
-        // start go routine and predictions here
-        // todo: add reading from fees.csv
+        // start go routines and predictions here
     }
 }

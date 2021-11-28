@@ -1,9 +1,9 @@
-exchange,api_key,comment
-BinanceUS,UYx1if8j8xamcmLmVvgOQo3ODpRypASl0BvBbpoCuGRk3p8IXUYKQn8Wrp7nSc2u,
-Kraken,R/5UQB4rwqn3JGHwLWQpWhf9rVwdMa4CnjTWWPceAwPYvcRhZ4wq1IcP,
-KuCoin,,
-LBank,,
-HitBTC,,high frequency trading
-OKEx,,no us
-FTX,,
-Bitbank,,no us
+exchange,api_key,fees,comment
+BinanceUS,UYx1if8j8xamcmLmVvgOQo3ODpRypASl0BvBbpoCuGRk3p8IXUYKQn8Wrp7nSc2u,0.1,
+Kraken,R/5UQB4rwqn3JGHwLWQpWhf9rVwdMa4CnjTWWPceAwPYvcRhZ4wq1IcP,0.05,
+KuCoin,,0.1,
+LBank,,0.1,
+HitBTC,,0.09,high frequency trading
+OKEx,,0.1,no us
+FTX,,0.07,
+Bitbank,,0.15,no us

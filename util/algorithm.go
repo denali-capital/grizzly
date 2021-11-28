@@ -84,7 +84,7 @@ func addCombinations(c chan []*types.Exchange, exchanges []*types.Exchange, k ui
 
     otherExchanges := make([]*types.Exchange, len(exchanges))
     copy(otherExchanges, exchanges)
-    for exchange := range exchanges {
+    for _, exchange := range exchanges {
         otherExchanges = otherExchanges[1:]
         addCombinations(c, otherExchanges, k - 1, append(init, exchange))
     }
