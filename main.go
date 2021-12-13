@@ -4,8 +4,11 @@ import (
     "log"
     "os"
     "strings"
+    "time"
 
     "github.com/denali-capital/grizzly/exchanges"
+    "github.com/denali-capital/grizzly/model/bootstrap"
+    "github.com/denali-capital/grizzly/model/nn"
     "github.com/denali-capital/grizzly/types"
     "github.com/denali-capital/grizzly/util"
     "github.com/joho/godotenv"
@@ -17,6 +20,15 @@ import (
 
 const configPath string = "config"
 const secretKeySuffix string = "_SECRET_KEY"
+const sleepDuration time.Duration = 100 * time.Millisecond
+
+func grizzly(exchange1 *types.Exchange, exchange2 *types.Exchange, allowedAssetPairs []types.AssetPair, killerInstinct *nn.KillerInstinct) {
+    for {
+        if killerInstinct.Predict()
+
+        time.Sleep(sleepDuration)
+    }
+}
 
 func main() {
     // need to create array of exchange objects
@@ -100,6 +112,8 @@ func main() {
 
     // run algo
 
+    killerInstinct := nn.NewKillerInstinct()
+
     for exchangePair := range util.ExchangeCombinations(exchanges, 2) {
         commonAssetPairs := util.AssetPairIntersection(
             assetPairTranslators[exchangePair[0].String()].GetAssetPairs(),
@@ -107,5 +121,6 @@ func main() {
         )
 
         // start go routines and predictions here
+        go grizzly(exchangePair[0], exchangePair[1], commonAssetPairs)
     }
 }

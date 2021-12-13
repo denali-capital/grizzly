@@ -2,13 +2,16 @@ package nn
 
 import (
     "log"
+    "sync"
 
     "github.com/denali-capital/grizzly/types"
     tg "github.com/galeone/tfgo"
     tf "github.com/tensorflow/tensorflow/tensorflow/go"
 )
 
+// lock or lock-free; for now, lock bc easier
 type KillerInstinct struct {
+    sync.RWMutex
     model *tg.Model
 }
 
@@ -63,6 +66,8 @@ func (k *KillerInstinct) Learn(observations []types.Observation) float32 {
         log.Fatalln(err)
     }
 
+    k.RLock()
+    defer k.RUnlock()
     return learn(k.model, dataTensor, labelTensor)
 }
 
@@ -105,5 +110,7 @@ func (k *KillerInstinct) Predict(observations []types.Observation) []float32 {
         log.Fatalln(err)
     }
 
+    k.Lock()
+    defer k.Unlock()
     return predict(k.model, dataTensor)
 }
