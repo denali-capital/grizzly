@@ -27,7 +27,7 @@ func ComputePriceVolatility(spreads []types.Spread) float64 {
     return sdev
 }
 
-func ComputeSlippage(orderbook types.OrderBook, quantity float64) float64 {
+func ComputeSlippage(orderbook *types.OrderBook, quantity float64) float64 {
     midpoint := (orderbook.Bids[0].Price + orderbook.Asks[0].Price) / 2
     idealCost := quantity * midpoint
 

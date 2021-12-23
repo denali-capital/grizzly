@@ -70,25 +70,6 @@ type OrderBookEntry struct {
     Quantity float64
 }
 
-type Exchange interface {
-    // * exchange specific information
-    String() string
-
-    // * getting data
-    GetHistoricalSpreads(assetPairs []AssetPair, duration time.Duration, samples uint) map[AssetPair][]Spread
-    GetCurrentSpread(assetPair AssetPair) Spread
-    GetOrderBooks(assetPairs []AssetPair) map[AssetPair]OrderBook
-    GetLatency() time.Duration
-
-    // * deal with orders
-    ExecuteOrders(orders []Order) map[Order]OrderId
-    GetOrderStatuses(orderIds []OrderId) map[OrderId]OrderStatus
-    CancelOrders(orderIds []OrderId)
-
-    // * getting account info
-    GetBalances() map[Asset]float64
-}
-
 type Observation struct {
     PriceDelta  float64
     Liquidity1  float64

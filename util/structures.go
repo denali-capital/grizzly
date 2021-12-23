@@ -14,22 +14,15 @@ func NewFixedSizeSpreadQueue(capacity uint) *FixedSizeSpreadQueue {
     }
 }
 
-func (f *FixedSizeSpreadQueue) Enqueue(item types.Spread) {
+func (f *FixedSizeSpreadQueue) Push(spread types.Spread) {
     if uint(len(f.internal)) == f.capacity {
-        f.internal = f.internal[1:]
+        f.Pop()
     }
-    f.internal = append(f.internal, item)
+    f.internal = append(f.internal, spread)
 }
 
-func (f *FixedSizeSpreadQueue) Dequeue() {
+func (f *FixedSizeSpreadQueue) Pop() {
     f.internal = f.internal[1:]
-}
-
-func (f *FixedSizeSpreadQueue) SetCapacity(capacity uint) {
-    f.capacity = capacity
-    if uint(len(f.internal)) > capacity {
-        f.internal = f.internal[uint(len(f.internal)) - capacity:]
-    }
 }
 
 func (f *FixedSizeSpreadQueue) Data() []types.Spread {

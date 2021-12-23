@@ -6,7 +6,9 @@ import (
     "strings"
     "time"
 
-    "github.com/denali-capital/grizzly/exchanges"
+    "github.com/denali-capital/grizzly/exchanges/binanceus"
+    "github.com/denali-capital/grizzly/exchanges/kraken"
+
     "github.com/denali-capital/grizzly/model/bootstrap"
     "github.com/denali-capital/grizzly/model/nn"
     "github.com/denali-capital/grizzly/types"
@@ -64,8 +66,8 @@ func main() {
     }
 
     assetPairsList := util.ReadCsvFile(configPath + "/assetpairs.csv")
-    if assetPairsList[0][0] != "canonical" {
-        log.Fatalln("Labels must be \"canonical,...\"")
+    if assetPairsList[0][0] != "canonical" || assetPairsList[0][1] != "ISO4217" {
+        log.Fatalln("Labels must be \"canonical,ISO4217,...\"")
     }
 
     exchangeIndices := make(map[string]uint)
@@ -102,9 +104,9 @@ func main() {
         }
         switch exchangeName {
         case "BinanceUS":
-            exchanges[i] = exchanges.NewBinanceUS(apiKey, secretKey, assetPairTranslators["BinanceUS"])
+            exchanges[i] = binanceus.NewBinanceUS(apiKey, secretKey, assetPairTranslators["BinanceUS"])
         case "Kraken":
-            exchanges[i] = exchanges.NewKraken(apiKey, secretKey, assetPairTranslators["Kraken"])
+            exchanges[i] = kraken.NewKraken(apiKey, secretKey, assetPairTranslators["Kraken"], assetPairTranslators["ISO4217"])
         default:
             log.Fatalln("Exchange implementation not found for %v", exchangeName)
         }

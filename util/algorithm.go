@@ -2,14 +2,13 @@ package util
 
 import (
     "fmt"
-    "strings"
 
     "github.com/denali-capital/grizzly/types"
 )
 
-func Zip(slices ...[]int) ([][]int, error) {
+func Zip(slices ...[]string) ([][]string, error) {
     if len(slices) == 0 {
-        return [][]int{}, nil
+        return [][]string{}, nil
     }
 
     length := len(slices[0])
@@ -19,10 +18,10 @@ func Zip(slices ...[]int) ([][]int, error) {
         }
     }
 
-    r := make([][]int, length)
+    r := make([][]string, length)
 
     for i, e := range slices[0] {
-        a := make([]int, len(slices))
+        a := make([]string, len(slices))
         a[0] = e
         for j := 1; j < len(slices); j++ {
             a[j] = slices[j][i]
@@ -37,11 +36,11 @@ func StringIntersection(a []string, b []string) []string {
     set := make([]string, 0)
     hash := make(map[string]bool)
 
-    for i := 0; i < a.Len(); i++ {
+    for i := 0; i < len(a); i++ {
         hash[a[i]] = true
     }
 
-    for i := 0; i < b.Len(); i++ {
+    for i := 0; i < len(b); i++ {
         if _, found := hash[b[i]]; found {
             set = append(set, b[i])
         }
@@ -54,11 +53,11 @@ func AssetPairIntersection(a []types.AssetPair, b []types.AssetPair) []types.Ass
     set := make([]types.AssetPair, 0)
     hash := make(map[types.AssetPair]bool)
 
-    for i := 0; i < a.Len(); i++ {
+    for i := 0; i < len(a); i++ {
         hash[a[i]] = true
     }
 
-    for i := 0; i < b.Len(); i++ {
+    for i := 0; i < len(b); i++ {
         if _, found := hash[b[i]]; found {
             set = append(set, b[i])
         }
@@ -96,8 +95,32 @@ func ExchangeCombinations(exchanges []*types.Exchange, k uint) <-chan []*types.E
     go func(c chan []*types.Exchange){
         defer close(c)
 
-        addCombinations(c, exchanges, k, []*types.Exchanges{})
+        addCombinations(c, exchanges, k, []*types.Exchange{})
     }(c)
 
     return c
+}
+
+func ReverseAssetPairTranslator(m types.AssetPairTranslator) map[string]types.AssetPair {
+    r := make(map[string]types.AssetPair, len(m))
+    for k, v := range m {
+        r[v] = k
+    }
+    return r
+}
+
+func GetAssetPairs(assetPairTranslator types.AssetPairTranslator) []types.AssetPair {
+    assetPairs := make([]types.AssetPair, len(assetPairTranslator))
+    i := 0
+    for assetPair := range assetPairTranslator {
+        assetPairs[i] = assetPair
+        i++
+    }
+    return assetPairs
+}
+
+func Copy(slice []interface{}) []interface{} {
+    tmp := make([]interface{}, len(slice))
+    copy(tmp, slice)
+    return tmp
 }

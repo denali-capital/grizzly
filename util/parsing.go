@@ -2,7 +2,6 @@ package util
 
 import (
     "encoding/csv"
-    "fmt"
     "go/importer"
     "log"
     "os"

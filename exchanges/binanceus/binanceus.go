@@ -1,4 +1,4 @@
-package exchanges
+package binanceus
 
 import (
     "crypto/hmac"
@@ -7,7 +7,6 @@ import (
     "io/ioutil"
     "log"
     "net/http"
-    "net/http/httputil"
     "net/url"
     "strconv"
     "strings"
@@ -18,7 +17,7 @@ import (
 )
 
 // docs: https://github.com/binance-us/binance-official-api-docs/blob/master/rest-api.md
-const BinanceUSEndpoint string = "https://api.binance.us"
+const RESTEndpoint string = "https://api.binance.us"
 
 type BinanceUS struct {
     AssetPairTranslator      types.AssetPairTranslator
@@ -139,7 +138,7 @@ func (b *BinanceUS) GetHistoricalSpreads(assetPairs []types.AssetPair, duration 
 }
 
 func (b *BinanceUS) GetCurrentSpread(assetPair types.AssetPair) types.Spread {
-    bodyJson := util.HttpGetAndGetBody(b.httpClient, util.ParseUrlWithQuery(BinanceUSEndpoint + "/api/v3/ticker/bookTicker", url.Values{
+    bodyJson := util.HttpGetAndGetBody(b.httpClient, util.ParseUrlWithQuery(RESTEndpoint + "/api/v3/ticker/bookTicker", url.Values{
         "symbol": []string{b.AssetPairTranslator[assetPair]},
     }))
     b.checkError(bodyJson)
@@ -160,7 +159,7 @@ func (b *BinanceUS) GetCurrentSpread(assetPair types.AssetPair) types.Spread {
 }
 
 func (b *BinanceUS) getOrderBook(assetPair types.AssetPair, channel chan types.OrderBookResponse) {
-    bodyJson := util.HttpGetAndGetBody(b.httpClient, util.ParseUrlWithQuery(BinanceUSEndpoint + "/api/v3/depth", url.Values{
+    bodyJson := util.HttpGetAndGetBody(b.httpClient, util.ParseUrlWithQuery(RESTEndpoint + "/api/v3/depth", url.Values{
         "symbol": []string{b.AssetPairTranslator[assetPair]},
     }))
     b.checkError(bodyJson)
@@ -197,7 +196,8 @@ func (b *BinanceUS) getOrderBook(assetPair types.AssetPair, channel chan types.O
     channel <- types.OrderBookResponse{assetPair, orderBook}
 }
 
-func (b *BinanceUS) GetOrderBooks(assetPairs []types.AssetPair) map[types.AssetPair]types.OrderBook {
+// remember that I changed it to return a pointer to OrderBook now!!!!
+func (b *BinanceUS) GetOrderBooks(assetPairs []types.AssetPair) map[types.AssetPair]*types.OrderBook {
     channel := make(chan types.OrderBookResponse)
     for _, assetPair := range assetPairs {
         go b.getOrderBook(assetPair, channel)
@@ -214,7 +214,7 @@ func (b *BinanceUS) GetOrderBooks(assetPairs []types.AssetPair) map[types.AssetP
 func (b *BinanceUS) GetLatency() time.Duration {
     start := time.Now()
 
-    bodyJson := util.HttpGetAndGetBody(b.httpClient, BinanceUSEndpoint + "/api/v3/ping")
+    bodyJson := util.HttpGetAndGetBody(b.httpClient, RESTEndpoint + "/api/v3/ping")
     b.checkError(bodyJson)
 
     duration := time.Since(start)
@@ -250,7 +250,7 @@ func (b *BinanceUS) executeOrder(order types.Order, channel chan types.OrderIdRe
 
     signature := b.getBinanceUSSignature(queryParams)
 
-    request, err := http.NewRequest("POST", util.ParseUrlWithQuery(BinanceUSEndpoint + "/api/v3/order", queryParams) + "&signature=" + signature, nil)
+    request, err := http.NewRequest("POST", util.ParseUrlWithQuery(RESTEndpoint + "/api/v3/order", queryParams) + "&signature=" + signature, nil)
     if err != nil {
         log.Fatalln(err)
     }
@@ -293,7 +293,7 @@ func (b *BinanceUS) getOrderStatus(orderId types.OrderId, channel chan types.Ord
 
     signature := b.getBinanceUSSignature(queryParams)
 
-    request, err := http.NewRequest("GET", util.ParseUrlWithQuery(BinanceUSEndpoint + "/api/v3/order", queryParams) + "&signature=" + signature, nil)
+    request, err := http.NewRequest("GET", util.ParseUrlWithQuery(RESTEndpoint + "/api/v3/order", queryParams) + "&signature=" + signature, nil)
     if err != nil {
         log.Fatalln(err)
     }
@@ -374,7 +374,7 @@ func (b *BinanceUS) cancelOrder(orderId types.OrderId) {
 
     signature := b.getBinanceUSSignature(queryParams)
 
-    request, err := http.NewRequest("DELETE", util.ParseUrlWithQuery(BinanceUSEndpoint + "/api/v3/order", queryParams) + "&signature=" + signature, nil)
+    request, err := http.NewRequest("DELETE", util.ParseUrlWithQuery(RESTEndpoint + "/api/v3/order", queryParams) + "&signature=" + signature, nil)
     if err != nil {
         log.Fatalln(err)
     }
@@ -399,14 +399,11 @@ func (b *BinanceUS) GetBalances() map[types.Asset]float64 {
 
     signature := b.getBinanceUSSignature(queryParams)
 
-    request, err := http.NewRequest("GET", util.ParseUrlWithQuery(BinanceUSEndpoint + "/api/v3/account", queryParams) + "&signature=" + signature, nil)
+    request, err := http.NewRequest("GET", util.ParseUrlWithQuery(RESTEndpoint + "/api/v3/account", queryParams) + "&signature=" + signature, nil)
     if err != nil {
         log.Fatalln(err)
     }
     request.Header.Set("X-MBX-APIKEY", b.apiKey)
-
-    dump, _ := httputil.DumpRequest(request, true)
-    fmt.Println(string(dump))
 
     bodyJson := util.DoHttpAndGetBody(b.httpClient, request)
     b.checkError(bodyJson)

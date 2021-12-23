@@ -71,7 +71,6 @@ func DoHttpAndGetBody(httpClient *http.Client, request *http.Request) map[string
     var bodyJson map[string]interface{}
     err = json.Unmarshal(body, &bodyJson)
     if err != nil {
-        log.Println(string(body))
         log.Fatalln(err)
     }
 
