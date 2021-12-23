@@ -314,10 +314,6 @@ func (k *Kraken) GetOrderStatuses(orderIds []types.OrderId) map[types.OrderId]ty
     return orderStatuses
 }
 
-func (k *Kraken) cancelOrder(orderId types.OrderId) {
-    
-}
-
 func (k *Kraken) CancelOrders(orderIds []types.OrderId) {
     if len(orderIds) == 0 {
         return
