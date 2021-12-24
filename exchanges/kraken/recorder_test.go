@@ -24,7 +24,7 @@ func testRecorderGetHistoricalSpreads(t *testing.T, krakenSpreadRecorder *Kraken
 		translatedPair := grizzlytesting.Iso4217Translator[assetPair]
 		historicalSpreads, ok := krakenSpreadRecorder.GetHistoricalSpreads(assetPair)
 		if !ok {
-			t.Fatalf("AssetPair %v should be recorded", translatedPair)
+			t.Fatalf("AssetPair %v should be recorded\n", translatedPair)
 		}
 		fmt.Printf("%v: %v\n", translatedPair, historicalSpreads)
 	}
@@ -36,7 +36,7 @@ func testSpreadRegisterAssetPair(t *testing.T, krakenSpreadRecorder *KrakenSprea
 	time.Sleep(grizzlytesting.SleepDuration)
 	historicalSpreads, ok := krakenSpreadRecorder.GetHistoricalSpreads(grizzlytesting.DOGEUSD)
 	if !ok {
-		t.Fatalf("AssetPair %v should be recorded", translatedPair)
+		t.Fatalf("AssetPair %v should be recorded\n", translatedPair)
 	}
 	fmt.Printf("%v: %v\n", translatedPair, historicalSpreads)
 }
@@ -57,7 +57,7 @@ func testGetOrderBook(t *testing.T, krakenOrderBookRecorder *KrakenOrderBookReco
 		translatedPair := grizzlytesting.Iso4217Translator[assetPair]
 		orderBook, ok := krakenOrderBookRecorder.GetOrderBook(assetPair)
 		if !ok {
-			t.Fatalf("AssetPair %v should be recorded", translatedPair)
+			t.Fatalf("AssetPair %v should be recorded\n", translatedPair)
 		}
 		fmt.Printf("%v: %v\n", translatedPair, orderBook)
 	}
@@ -69,7 +69,7 @@ func testOrderBookRegisterAssetPair(t *testing.T, krakenOrderBookRecorder *Krake
 	time.Sleep(grizzlytesting.SleepDuration)
 	orderBook, ok := krakenOrderBookRecorder.GetOrderBook(grizzlytesting.DOGEUSD)
 	if !ok {
-		t.Fatalf("AssetPair %v should be recorded", translatedPair)
+		t.Fatalf("AssetPair %v should be recorded\n", translatedPair)
 	}
 	fmt.Printf("%v: %v\n", translatedPair, orderBook)
 }

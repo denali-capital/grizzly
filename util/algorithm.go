@@ -109,8 +109,16 @@ func ReverseAssetPairTranslator(m types.AssetPairTranslator) map[string]types.As
     return r
 }
 
-func Copy(slice []interface{}) []interface{} {
+func SliceCopy(slice []interface{}) []interface{} {
     tmp := make([]interface{}, len(slice))
     copy(tmp, slice)
+    return tmp
+}
+
+func MapCopy(m map[string]interface{}) map[string]interface{} {
+    tmp := make(map[string]interface{})
+    for k, v := range m {
+        tmp[k] = v
+    }
     return tmp
 }

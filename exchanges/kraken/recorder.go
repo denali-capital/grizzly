@@ -59,7 +59,7 @@ type krakenWebSocketRecorder struct {
     webSocketConnection *websocket.Conn
     iso4217Translator   types.AssetPairTranslator
     // map[uint]chan []interface{}
-    channels        *sync.Map
+    channels            *sync.Map
 }
 
 func (k *krakenWebSocketRecorder) record() {
@@ -79,7 +79,7 @@ func (k *krakenWebSocketRecorder) record() {
             if !ok {
                 log.Fatalf("channel not found for channelId %v\n", channelId)
             }
-            channel.(chan []interface{}) <- util.Copy(resp)
+            channel.(chan []interface{}) <- util.SliceCopy(resp)
         }
         k.Unlock()
     }
@@ -87,9 +87,9 @@ func (k *krakenWebSocketRecorder) record() {
 
 type KrakenSpreadRecorder struct {
     krakenWebSocketRecorder
-    capacity                 uint
+    capacity                uint
     // map[types.AssetPair]*util.FixedSizeSpreadQueue
-    historicalSpreads        *sync.Map
+    historicalSpreads       *sync.Map
 }
 
 func NewKrakenSpreadRecorder(assetPairs []types.AssetPair, iso4217Translator types.AssetPairTranslator, capacity uint) *KrakenSpreadRecorder {
@@ -235,9 +235,9 @@ func (k *KrakenSpreadRecorder) RegisterAssetPair(assetPair types.AssetPair) {
                 channelId := uint(resp[0].(float64))
                 channel, ok := k.channels.Load(channelId)
                 if !ok {
-                    log.Fatalf("channel not found for channelId %v", channelId)
+                    log.Fatalf("channel not found for channelId %v\n", channelId)
                 }
-                channel.(chan []interface{}) <- util.Copy(resp)
+                channel.(chan []interface{}) <- util.SliceCopy(resp)
                 continue
             }
             if !(initialResponse["event"].(string) == "subscriptionStatus" && initialResponse["pair"].(string) == iso4217TranslatedPair && initialResponse["status"].(string) == "subscribed") {
@@ -257,9 +257,9 @@ func (k *KrakenSpreadRecorder) RegisterAssetPair(assetPair types.AssetPair) {
 // very much inspired by https://github.com/jurijbajzelj/kraken_ws_orderbook
 type KrakenOrderBookRecorder struct {
     krakenWebSocketRecorder
-    depth                    uint
+    depth                   uint
     // map[types.AssetPair]*types.OrderBook
-    orderBooks        *sync.Map
+    orderBooks              *sync.Map
 }
 
 func NewKrakenOrderBookRecorder(assetPairs []types.AssetPair, iso4217Translator types.AssetPairTranslator, depth uint) *KrakenOrderBookRecorder {
@@ -422,7 +422,7 @@ func (k *KrakenOrderBookRecorder) processOrderBookUpdates(channelId uint, assetP
         case resp := <- channel:
             orderBook, ok := k.orderBooks.Load(assetPair)
             if !ok {
-                log.Fatalf("orderBook not found for assetPair %v", assetPair)
+                log.Fatalf("orderBook not found for assetPair %v\n", assetPair)
             }
             bids := orderBook.(*types.OrderBook).Bids
             asks := orderBook.(*types.OrderBook).Asks
@@ -570,9 +570,9 @@ func (k *KrakenOrderBookRecorder) RegisterAssetPair(assetPair types.AssetPair) {
                 channelId := uint(resp[0].(float64))
                 channel, ok := k.channels.Load(channelId)
                 if !ok {
-                    log.Fatalf("channel not found for channelId %v", channelId)
+                    log.Fatalf("channel not found for channelId %v\n", channelId)
                 }
-                channel.(chan []interface{}) <- util.Copy(resp)
+                channel.(chan []interface{}) <- util.SliceCopy(resp)
                 continue
             }
             if !(initialResponse["event"].(string) == "subscriptionStatus" && initialResponse["pair"].(string) == iso4217TranslatedPair && initialResponse["status"].(string) == "subscribed") {
@@ -601,9 +601,9 @@ func (k *KrakenOrderBookRecorder) RegisterAssetPair(assetPair types.AssetPair) {
             if messageChannelId := uint(resp[0].(float64)); messageChannelId != channelId {
                 channel, ok := k.channels.Load(messageChannelId)
                 if !ok {
-                    log.Fatalf("channel not found for channelId %v", messageChannelId)
+                    log.Fatalf("channel not found for channelId %v\n", messageChannelId)
                 }
-                channel.(chan []interface{}) <- util.Copy(resp)
+                channel.(chan []interface{}) <- util.SliceCopy(resp)
                 continue
             }
             break

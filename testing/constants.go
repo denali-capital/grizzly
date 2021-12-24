@@ -9,16 +9,28 @@ import (
 const (
 	BTCUSD types.AssetPair = iota
 	ADAUSDT
-	ETHUSDC
+	BTCUSDC
 	DOGEUSD
 )
 
-var AssetPairs []types.AssetPair = []types.AssetPair{BTCUSD, ADAUSDT, ETHUSDC}
+var AssetPairs []types.AssetPair = []types.AssetPair{BTCUSD, ADAUSDT, BTCUSDC}
 var Iso4217Translator types.AssetPairTranslator = types.AssetPairTranslator{
 	BTCUSD: "XBT/USD",
 	ADAUSDT: "ADA/USDT",
-	ETHUSDC: "ETH/USDC",
+	BTCUSDC: "XBT/USDC",
 	DOGEUSD: "XDG/USD",
+}
+var BinanceUSAssetPairTranslator types.AssetPairTranslator = types.AssetPairTranslator{
+	BTCUSD: "BTCUSD",
+	ADAUSDT: "ADAUSDT",
+	BTCUSDC: "BTCUSDC",
+	DOGEUSD: "DOGEUSD",
+}
+var KrakenAssetPairTranslator types.AssetPairTranslator = types.AssetPairTranslator{
+	BTCUSD: "XXBTZUSD",
+	ADAUSDT: "ADAUSDT",
+	BTCUSDC: "XBTUSDC",
+	DOGEUSD: "XDGUSD",
 }
 
 const SleepDuration time.Duration = 3 * time.Second

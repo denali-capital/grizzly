@@ -6,21 +6,14 @@ import (
 	"time"
 
 	grizzlytesting "github.com/denali-capital/grizzly/testing"
-	"github.com/denali-capital/grizzly/types"
 )
 
 const apiKey string = "c8Mrlv+qder9EzFm+1trJRthtsYzgSBYHNP8opkB0O5FR+gS3UY52ex0"
 const secretKey string = "B/8Kf+5NdjqHMRrByJa/nd9QByUzfgVt1ZsagcsNbhlLjGs1tht7VBwiH6sCl83O8k6/cBdS0sblWkITrHglDA=="
-var assetPairTranslator types.AssetPairTranslator = types.AssetPairTranslator{
-	grizzlytesting.BTCUSD: "XXBTZUSD",
-	grizzlytesting.ADAUSDT: "ADAUSDT",
-	grizzlytesting.ETHUSDC: "ETHUSDC",
-	grizzlytesting.DOGEUSD: "XDGUSD",
-}
 
 // TODO: test use data stuff
 func TestKraken(t *testing.T) {
-	kraken := NewKraken(apiKey, secretKey, assetPairTranslator, grizzlytesting.Iso4217Translator)
+	kraken := NewKraken(apiKey, secretKey, grizzlytesting.KrakenAssetPairTranslator, grizzlytesting.Iso4217Translator)
 	time.Sleep(grizzlytesting.SleepDuration)
 	t.Run("GetHistoricalSpreads", func(t *testing.T) {
 		testKrakenGetHistoricalSpreads(t, kraken)
@@ -48,7 +41,7 @@ func testKrakenGetHistoricalSpreads(t *testing.T, kraken *Kraken) {
 		if uint(len(historicalSpread)) != grizzlytesting.Samples {
 			t.Fatalf("There should be %v samples", grizzlytesting.Samples)
 		}
-		fmt.Printf("%v : %v\n", assetPairTranslator[assetPair], historicalSpread)
+		fmt.Printf("%v : %v\n", grizzlytesting.KrakenAssetPairTranslator[assetPair], historicalSpread)
 	}
 	fmt.Println(historicalSpreads)
 }
@@ -64,7 +57,7 @@ func testGetOrderBooks(t *testing.T, kraken *Kraken) {
 		t.Fatalf("OrderBooks should not be empty")
 	}
 	for assetPair, orderBook := range orderBooks {
-		fmt.Printf("%v: %v\n", assetPairTranslator[assetPair], *orderBook)
+		fmt.Printf("%v: %v\n", grizzlytesting.KrakenAssetPairTranslator[assetPair], *orderBook)
 	}
 }
 
