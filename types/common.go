@@ -1,10 +1,14 @@
 package types
 
-import "time"
+import (
+    "time"
+
+    "github.com/shopspring/decimal"
+)
 
 type Spread struct {
-    Bid       float64
-    Ask       float64
+    Bid       decimal.Decimal
+    Ask       decimal.Decimal
     Timestamp *time.Time
 }
 
@@ -36,8 +40,8 @@ func (a AssetPairTranslator) GetAssetPairs() []AssetPair {
 type Order struct {
     OrderType OrderType
     AssetPair AssetPair
-    Price     float64
-    Quantity  float64
+    Price     decimal.Decimal
+    Quantity  decimal.Decimal
 }
 
 type OrderId string
@@ -55,8 +59,8 @@ const (
 
 type OrderStatus struct {
     Status         StatusType
-    FilledPrice    *float64
-    FilledQuantity *float64
+    FilledPrice    *decimal.Decimal
+    FilledQuantity *decimal.Decimal
     Original       *Order
 }
 
@@ -66,18 +70,18 @@ type OrderBook struct {
 }
 
 type OrderBookEntry struct {
-    Price    float64
-    Quantity float64
+    Price    decimal.Decimal
+    Quantity decimal.Decimal
 }
 
 type Observation struct {
-    PriceDelta  float64
-    Liquidity1  float64
-    Liquidity2  float64
-    Latency1    float64
-    Latency2    float64
-    Volatility1 float64
-    Volatility2 float64
+    PriceDelta  float32
+    Liquidity1  float32
+    Liquidity2  float32
+    Latency1    float32
+    Latency2    float32
+    Volatility1 float32
+    Volatility2 float32
 
     // optional
     Label       int32

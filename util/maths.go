@@ -6,15 +6,17 @@ import (
 
     "github.com/montanaflynn/stats"
     "github.com/denali-capital/grizzly/types"
+    "github.com/shopspring/decimal"
 )
 
 // TODO: can do better than midpoint prices based on the paper
+var two decimal.Decimal = decimal.NewFromInt(2)
 
 func ComputePriceVolatility(spreads []types.Spread) float64 {
     midpoints := make([]float64, len(spreads))
 
     for i, spread := range spreads {
-        midpoints[i] = (spread.Bid + spread.Ask) / 2
+        midpoints[i] = spread.Bid.Add(spread.Ask).Div(two).InexactFloat64()
     }
 
     sdev, err := stats.StdDevS(midpoints)
@@ -27,9 +29,9 @@ func ComputePriceVolatility(spreads []types.Spread) float64 {
     return sdev
 }
 
-func ComputeSlippage(orderbook *types.OrderBook, quantity float64) float64 {
-    midpoint := (orderbook.Bids[0].Price + orderbook.Asks[0].Price) / 2
-    idealCost := quantity * midpoint
+func ComputeSlippage(orderbook *types.OrderBook, quantity decimal.Decimal) decimal.Decimal {
+    midpoint := orderbook.Bids[0].Price.Add(orderbook.Asks[0].Price).Div(two)
+    idealCost := quantity.Mul(midpoint)
 
     // compute slippage on buy side
     buyCost := computeOrderCost(orderbook.Asks, quantity)
@@ -37,21 +39,21 @@ func ComputeSlippage(orderbook *types.OrderBook, quantity float64) float64 {
     // compute slippage on sell side
     sellCost := computeOrderCost(orderbook.Bids, quantity)
 
-    return (buyCost - sellCost) / (2 * idealCost)
+    return buyCost.Sub(sellCost).Div(idealCost.Mul(two))
 }
 
-func computeOrderCost(side []types.OrderBookEntry, amountToFill float64) float64 {
-    cumulativeCost := float64(0)
+func computeOrderCost(side []types.OrderBookEntry, amountToFill decimal.Decimal) decimal.Decimal {
+    cumulativeCost := decimal.Zero
 
     for _, entry := range side {
-        if amountToFill < entry.Quantity {
-            cumulativeCost += amountToFill * entry.Price
+        if amountToFill.LessThan(entry.Quantity) {
+            cumulativeCost = cumulativeCost.Add(amountToFill.Mul(entry.Price))
             // the order is now entirely filled
             break
         }
 
-        cumulativeCost += entry.Quantity * entry.Price
-        amountToFill -= entry.Quantity
+        cumulativeCost = cumulativeCost.Add(entry.Quantity.Mul(entry.Price))
+        amountToFill = amountToFill.Sub(entry.Quantity)
     }
 
     return cumulativeCost

@@ -14,6 +14,7 @@ import (
 
     "github.com/denali-capital/grizzly/types"
     "github.com/denali-capital/grizzly/util"
+    "github.com/shopspring/decimal"
 )
 
 // docs: https://docs.kraken.com/rest/
@@ -34,7 +35,7 @@ type Kraken struct {
 }
 
 func NewKraken(apiKey, secretKey string, assetPairTranslator types.AssetPairTranslator, iso4217Translator types.AssetPairTranslator) *Kraken {
-    assetPairs := util.GetAssetPairs(assetPairTranslator)
+    assetPairs := assetPairTranslator.GetAssetPairs()
     return &Kraken{
         AssetPairTranslator: assetPairTranslator,
         apiKey: apiKey,
@@ -97,11 +98,11 @@ func (k *Kraken) GetCurrentSpread(assetPair types.AssetPair) types.Spread {
 
     data := bodyJson["result"].(map[string]interface{})[k.AssetPairTranslator[assetPair]].(map[string]interface{})
 
-    bid, err := strconv.ParseFloat(data["b"].([]interface{})[0].(string), 64)
+    bid, err := decimal.NewFromString(data["b"].([]interface{})[0].(string))
     if err != nil {
         log.Fatalln(err)
     }
-    ask, err := strconv.ParseFloat(data["a"].([]interface{})[0].(string), 64)
+    ask, err := decimal.NewFromString(data["a"].([]interface{})[0].(string))
     if err != nil {
         log.Fatalln(err)
     }
@@ -175,8 +176,8 @@ func (k *Kraken) executeOrder(order types.Order, channel chan types.OrderIdRespo
         "pair": []string{k.AssetPairTranslator[order.AssetPair]},
         "type": []string{k.parseOrderType(order.OrderType)},
         "ordertype": []string{"limit"},
-        "price": []string{strconv.FormatFloat(order.Price, 'f', -1, 64)},
-        "volume": []string{strconv.FormatFloat(order.Quantity, 'f', -1, 64)},
+        "price": []string{order.Price.String()},
+        "volume": []string{order.Quantity.String()},
         "nonce": []string{strconv.FormatInt(time.Now().UnixMilli(), 10)},
     }
     request, err := http.NewRequest("POST", RESTEndpoint + "/0/private/AddOrder", strings.NewReader(queryParams.Encode()))
@@ -255,11 +256,11 @@ func (k *Kraken) GetOrderStatuses(orderIds []types.OrderId) map[types.OrderId]ty
         case "open":
             orderStatus.Status = types.Unfilled
         case "closed":
-            price, err := strconv.ParseFloat(rawOrderData["price"].(string), 64)
+            price, err := decimal.NewFromString(rawOrderData["price"].(string))
             if err != nil {
                 log.Fatalln(err)
             }
-            quantity, err := strconv.ParseFloat(rawOrderData["vol_exec"].(string), 64)
+            quantity, err := decimal.NewFromString(rawOrderData["vol_exec"].(string))
             if err != nil {
                 log.Fatalln(err)
             }
@@ -309,7 +310,7 @@ func (k *Kraken) CancelOrders(orderIds []types.OrderId) {
     }
 }
 
-func (k *Kraken) GetBalances() map[types.Asset]float64 {
+func (k *Kraken) GetBalances() map[types.Asset]decimal.Decimal {
     queryParams := url.Values{
         "nonce": []string{strconv.FormatInt(time.Now().UnixMilli(), 10)},
     }
@@ -328,14 +329,14 @@ func (k *Kraken) GetBalances() map[types.Asset]float64 {
     if _, ok := bodyJson["result"]; ok {
         data := bodyJson["result"].(map[types.Asset]string)
 
-        balances := make(map[types.Asset]float64)
+        balances := make(map[types.Asset]decimal.Decimal)
         for asset, balanceString := range data {
-            balances[asset], err = strconv.ParseFloat(balanceString, 64)
+            balances[asset], err = decimal.NewFromString(balanceString)
             if err != nil {
                 log.Fatalln(err)
             }
         }
         return balances
     }
-    return make(map[types.Asset]float64)
+    return make(map[types.Asset]decimal.Decimal)
 }

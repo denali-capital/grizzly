@@ -1,6 +1,10 @@
 package types
 
-import "time"
+import (
+    "time"
+
+    "github.com/shopspring/decimal"
+)
 
 type Exchange interface {
     // * exchange specific information
@@ -18,7 +22,7 @@ type Exchange interface {
     CancelOrders(orderIds []OrderId)
 
     // * getting account info
-    GetBalances() map[Asset]float64
+    GetBalances() map[Asset]decimal.Decimal
 }
 
 // add closing?

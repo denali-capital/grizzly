@@ -14,6 +14,7 @@ import (
 
     "github.com/denali-capital/grizzly/types"
     "github.com/denali-capital/grizzly/util"
+    "github.com/shopspring/decimal"
 )
 
 // docs: https://github.com/binance-us/binance-official-api-docs/blob/master/rest-api.md
@@ -32,12 +33,7 @@ type BinanceUS struct {
 }
 
 func NewBinanceUS(apiKey, secretKey string, assetPairTranslator types.AssetPairTranslator) *BinanceUS {
-    assetPairs := make([]types.AssetPair, len(assetPairTranslator))
-    i := 0
-    for assetPair := range assetPairTranslator {
-        assetPairs[i] = assetPair
-        i++
-    }
+    assetPairs := assetPairTranslator.GetAssetPairs()
     binanceUS := &BinanceUS{
         AssetPairTranslator: assetPairTranslator,
         apiKey: apiKey,
@@ -108,11 +104,11 @@ func (b *BinanceUS) GetCurrentSpread(assetPair types.AssetPair) types.Spread {
     }))
     b.checkError(bodyJson)
 
-    bid, err := strconv.ParseFloat(bodyJson["bidPrice"].(string), 64)
+    bid, err := decimal.NewFromString(bodyJson["bidPrice"].(string))
     if err != nil {
         log.Fatalln(err)
     }
-    ask, err := strconv.ParseFloat(bodyJson["askPrice"].(string), 64)
+    ask, err := decimal.NewFromString(bodyJson["askPrice"].(string))
     if err != nil {
         log.Fatalln(err)
     }
@@ -131,11 +127,11 @@ func (b *BinanceUS) getOrderBook(assetPair types.AssetPair, channel chan types.O
 
     orderBook := types.OrderBook{}
     for _, rawOrderBookEntry := range bodyJson["asks"].([]interface{}) {
-        price, err := strconv.ParseFloat(rawOrderBookEntry.([]interface{})[0].(string), 64)
+        price, err := decimal.NewFromString(rawOrderBookEntry.([]interface{})[0].(string))
         if err != nil {
             log.Fatalln(err)
         }
-        quantity, err := strconv.ParseFloat(rawOrderBookEntry.([]interface{})[1].(string), 64)
+        quantity, err := decimal.NewFromString(rawOrderBookEntry.([]interface{})[1].(string))
         if err != nil {
             log.Fatalln(err)
         }
@@ -145,11 +141,11 @@ func (b *BinanceUS) getOrderBook(assetPair types.AssetPair, channel chan types.O
         })
     }
     for _, rawOrderBookEntry := range bodyJson["bids"].([]interface{}) {
-        price, err := strconv.ParseFloat(rawOrderBookEntry.([]interface{})[0].(string), 64)
+        price, err := decimal.NewFromString(rawOrderBookEntry.([]interface{})[0].(string))
         if err != nil {
             log.Fatalln(err)
         }
-        quantity, err := strconv.ParseFloat(rawOrderBookEntry.([]interface{})[1].(string), 64)
+        quantity, err := decimal.NewFromString(rawOrderBookEntry.([]interface{})[1].(string))
         if err != nil {
             log.Fatalln(err)
         }
@@ -208,8 +204,8 @@ func (b *BinanceUS) executeOrder(order types.Order, channel chan types.OrderIdRe
         "side": []string{b.parseOrderType(order.OrderType)},
         "type": []string{"LIMIT"},
         "timeInForce": []string{"GTC"},
-        "price": []string{strconv.FormatFloat(order.Price, 'f', -1, 64)},
-        "quantity": []string{strconv.FormatFloat(order.Quantity, 'f', -1, 64)},
+        "price": []string{order.Price.String()},
+        "quantity": []string{order.Quantity.String()},
         "timestamp": []string{strconv.FormatInt(time.Now().UnixMilli(), 10)},
     }
 
@@ -275,11 +271,11 @@ func (b *BinanceUS) getOrderStatus(orderId types.OrderId, channel chan types.Ord
     case "NEW":
         orderStatus.Status = types.Unfilled
     case "PARTIALLY_FILLED":
-        price, err := strconv.ParseFloat(bodyJson["price"].(string), 64)
+        price, err := decimal.NewFromString(bodyJson["price"].(string))
         if err != nil {
             log.Fatalln(err)
         }
-        quantity, err := strconv.ParseFloat(bodyJson["executedQty"].(string), 64)
+        quantity, err := decimal.NewFromString(bodyJson["executedQty"].(string))
         if err != nil {
             log.Fatalln(err)
         }
@@ -287,11 +283,11 @@ func (b *BinanceUS) getOrderStatus(orderId types.OrderId, channel chan types.Ord
         orderStatus.FilledPrice = &price
         orderStatus.FilledQuantity = &quantity
     case "FILLED":
-        price, err := strconv.ParseFloat(bodyJson["price"].(string), 64)
+        price, err := decimal.NewFromString(bodyJson["price"].(string))
         if err != nil {
             log.Fatalln(err)
         }
-        quantity, err := strconv.ParseFloat(bodyJson["executedQty"].(string), 64)
+        quantity, err := decimal.NewFromString(bodyJson["executedQty"].(string))
         if err != nil {
             log.Fatalln(err)
         }
@@ -357,7 +353,7 @@ func (b *BinanceUS) CancelOrders(orderIds []types.OrderId) {
     }
 }
 
-func (b *BinanceUS) GetBalances() map[types.Asset]float64 {
+func (b *BinanceUS) GetBalances() map[types.Asset]decimal.Decimal {
     queryParams := url.Values{
         "timestamp": []string{strconv.FormatInt(time.Now().UnixMilli(), 10)},
     }
@@ -373,18 +369,18 @@ func (b *BinanceUS) GetBalances() map[types.Asset]float64 {
     bodyJson := util.DoHttpAndGetBody(b.httpClient, request)
     b.checkError(bodyJson)
 
-    balances := make(map[types.Asset]float64)
+    balances := make(map[types.Asset]decimal.Decimal)
     for _, rawData := range bodyJson["balances"].([]interface{}) {
         data := rawData.(map[string]string)
-        free, err := strconv.ParseFloat(data["free"], 64)
+        free, err := decimal.NewFromString(data["free"])
         if err != nil {
             log.Fatalln(err)
         }
-        locked, err := strconv.ParseFloat(data["locked"], 64)
+        locked, err := decimal.NewFromString(data["locked"])
         if err != nil {
             log.Fatalln(err)
         }
-        balances[types.Asset(data["asset"])] = free + locked
+        balances[types.Asset(data["asset"])] = free.Add(locked)
     }
     return balances
 }

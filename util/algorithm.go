@@ -109,16 +109,6 @@ func ReverseAssetPairTranslator(m types.AssetPairTranslator) map[string]types.As
     return r
 }
 
-func GetAssetPairs(assetPairTranslator types.AssetPairTranslator) []types.AssetPair {
-    assetPairs := make([]types.AssetPair, len(assetPairTranslator))
-    i := 0
-    for assetPair := range assetPairTranslator {
-        assetPairs[i] = assetPair
-        i++
-    }
-    return assetPairs
-}
-
 func Copy(slice []interface{}) []interface{} {
     tmp := make([]interface{}, len(slice))
     copy(tmp, slice)

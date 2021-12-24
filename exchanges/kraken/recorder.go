@@ -156,11 +156,11 @@ func (k *KrakenSpreadRecorder) processSpreadUpdates(channelId uint, assetPair ty
         select {
         case resp := <- channel:
             rawSpread := resp[1].([]interface{})
-            bid, err := strconv.ParseFloat(rawSpread[0].(string), 64)
+            bid, err := decimal.NewFromString(rawSpread[0].(string))
             if err != nil {
                 log.Fatalln(err)
             }
-            ask, err := strconv.ParseFloat(rawSpread[1].(string), 64)
+            ask, err := decimal.NewFromString(rawSpread[1].(string))
             if err != nil {
                 log.Fatalln(err)
             }
@@ -254,23 +254,12 @@ func (k *KrakenSpreadRecorder) RegisterAssetPair(assetPair types.AssetPair) {
     go k.processSpreadUpdates(channelId, assetPair, channel)
 }
 
-type DecimalOrderBook struct {
-    Bids []DecimalOrderBookEntry
-    Asks []DecimalOrderBookEntry
-}
-
-type DecimalOrderBookEntry struct {
-    Price    decimal.Decimal
-    Quantity decimal.Decimal
-}
-
 // very much inspired by https://github.com/jurijbajzelj/kraken_ws_orderbook
 type KrakenOrderBookRecorder struct {
     krakenWebSocketRecorder
     depth                    uint
-    // for calculating checksum
-    // map[types.AssetPair]*DecimalOrderBook
-    decimalOrderBooks        *sync.Map
+    // map[types.AssetPair]*types.OrderBook
+    orderBooks        *sync.Map
 }
 
 func NewKrakenOrderBookRecorder(assetPairs []types.AssetPair, iso4217Translator types.AssetPairTranslator, depth uint) *KrakenOrderBookRecorder {
@@ -314,7 +303,7 @@ func NewKrakenOrderBookRecorder(assetPairs []types.AssetPair, iso4217Translator 
     }
 
     // get initial books
-    decimalOrderBooks := &sync.Map{}
+    orderBooks := &sync.Map{}
     var resp []interface{}
     for i := 0; i < len(iso4217TranslatedPairs); i++ {
         for {
@@ -333,31 +322,31 @@ func NewKrakenOrderBookRecorder(assetPairs []types.AssetPair, iso4217Translator 
         }
 
         // we assume here that all initial book messages come right after another
-        decimalOrderBook := &DecimalOrderBook{}
+        orderBook := &types.OrderBook{}
         channelId := uint(resp[0].(float64))
         rawOrderBook := resp[1].(map[string]interface{})
         for _, rawOrderBookEntry := range rawOrderBook["as"].([]interface{}) {
-            price, quantity := GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
-            decimalOrderBook.Asks = append(decimalOrderBook.Asks, DecimalOrderBookEntry{
+            price, quantity := util.GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
+            orderBook.Asks = append(orderBook.Asks, types.OrderBookEntry{
                 Price: price,
                 Quantity: quantity,
             })
-            if uint(len(decimalOrderBook.Asks)) == depth {
+            if uint(len(orderBook.Asks)) == depth {
                 break
             }
         }
         for _, rawOrderBookEntry := range rawOrderBook["bs"].([]interface{}) {
-            price, quantity := GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
-            decimalOrderBook.Bids = append(decimalOrderBook.Bids, DecimalOrderBookEntry{
+            price, quantity := util.GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
+            orderBook.Bids = append(orderBook.Bids, types.OrderBookEntry{
                 Price: price,
                 Quantity: quantity,
             })
-            if uint(len(decimalOrderBook.Bids)) == depth {
+            if uint(len(orderBook.Bids)) == depth {
                 break
             }
         }
 
-        decimalOrderBooks.Store(channelIdTranslator[channelId], decimalOrderBook)
+        orderBooks.Store(channelIdTranslator[channelId], orderBook)
     }
 
     krakenOrderBookRecorder := &KrakenOrderBookRecorder{
@@ -367,7 +356,7 @@ func NewKrakenOrderBookRecorder(assetPairs []types.AssetPair, iso4217Translator 
             channels: channels,
         },
         depth: depth,
-        decimalOrderBooks: decimalOrderBooks,
+        orderBooks: orderBooks,
     }
 
     channels.Range(func(rawChannelId, rawChannel interface{}) bool {
@@ -392,7 +381,7 @@ func preFormatDecimal(val decimal.Decimal) string {
     return val.StringFixed(int32(val.NumDigits() - len(val.Truncate(0).String()) + offset))
 }
 
-func getChecksumInput(bids []DecimalOrderBookEntry, asks []DecimalOrderBookEntry) string {
+func getChecksumInput(bids []types.OrderBookEntry, asks []types.OrderBookEntry) string {
     var str strings.Builder
     for _, orderBookEntry := range asks[:10] {
         price := preFormatDecimal(orderBookEntry.Price)
@@ -419,7 +408,7 @@ func getChecksumInput(bids []DecimalOrderBookEntry, asks []DecimalOrderBookEntry
     return str.String()
 }
 
-func verifyOrderBookChecksum(bids []DecimalOrderBookEntry, asks []DecimalOrderBookEntry, checksum string) {
+func verifyOrderBookChecksum(bids []types.OrderBookEntry, asks []types.OrderBookEntry, checksum string) {
     checksumInput := getChecksumInput(bids, asks)
     crc := crc32.ChecksumIEEE([]byte(checksumInput))
     if fmt.Sprint(crc) != checksum {
@@ -431,12 +420,12 @@ func (k *KrakenOrderBookRecorder) processOrderBookUpdates(channelId uint, assetP
     for {
         select {
         case resp := <- channel:
-            decimalOrderBook, ok := k.decimalOrderBooks.Load(assetPair)
+            orderBook, ok := k.orderBooks.Load(assetPair)
             if !ok {
-                log.Fatalf("decimalOrderBook not found for assetPair %v", assetPair)
+                log.Fatalf("orderBook not found for assetPair %v", assetPair)
             }
-            bids := decimalOrderBook.(*DecimalOrderBook).Bids
-            asks := decimalOrderBook.(*DecimalOrderBook).Asks
+            bids := orderBook.(*types.OrderBook).Bids
+            asks := orderBook.(*types.OrderBook).Asks
             if len(resp) == 4 {
                 // one of bids or asks is updated
                 orderBookDiff := resp[1].(map[string]interface{})
@@ -444,36 +433,36 @@ func (k *KrakenOrderBookRecorder) processOrderBookUpdates(channelId uint, assetP
 
                 if val, ok := orderBookDiff["b"]; ok {
                     for _, rawOrderBookEntry := range val.([]interface{}) {
-                        price, quantity := GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
+                        price, quantity := util.GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
                         if quantity.Equal(decimal.Zero) {
-                            bids = RemovePriceFromBids(bids, price)
+                            bids = util.RemovePriceFromBids(bids, price)
                         } else {
                             if len(rawOrderBookEntry.([]interface{})) == 4 {
                                 // it has the 4th element "r" so we just re-append
-                                bids = append(bids, DecimalOrderBookEntry{
+                                bids = append(bids, types.OrderBookEntry{
                                     Price: price,
                                     Quantity: quantity,
                                 })
                             } else {
-                                bids = InsertPriceInBids(bids, price, quantity)
+                                bids = util.InsertPriceInBids(bids, price, quantity)
                                 bids = bids[:k.depth]
                             }
                         }
                     }
                 } else {
                     for _, rawOrderBookEntry := range orderBookDiff["a"].([]interface{}) {
-                        price, quantity := GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
+                        price, quantity := util.GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
                         if quantity.Equal(decimal.Zero) {
-                            asks = RemovePriceFromAsks(asks, price)
+                            asks = util.RemovePriceFromAsks(asks, price)
                         } else {
                             if len(rawOrderBookEntry.([]interface{})) == 4 {
                                 // it has the 4th element "r" so we just re-append
-                                asks = append(asks, DecimalOrderBookEntry{
+                                asks = append(asks, types.OrderBookEntry{
                                     Price: price,
                                     Quantity: quantity,
                                 })
                             } else {
-                                asks = InsertPriceInAsks(asks, price, quantity)
+                                asks = util.InsertPriceInAsks(asks, price, quantity)
                                 asks = asks[:k.depth]
                             }
                         }
@@ -487,42 +476,42 @@ func (k *KrakenOrderBookRecorder) processOrderBookUpdates(channelId uint, assetP
                 checksum := orderBookDiffBids["c"].(string)
 
                 for _, rawOrderBookEntry := range orderBookDiffBids["b"].([]interface{}) {
-                    price, quantity := GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
+                    price, quantity := util.GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
                     if quantity.Equal(decimal.Zero) {
-                        bids = RemovePriceFromBids(bids, price)
+                        bids = util.RemovePriceFromBids(bids, price)
                     } else {
                         if len(rawOrderBookEntry.([]interface{})) == 4 {
                             // it has the 4th element "r" so we just re-append
-                            bids = append(bids, DecimalOrderBookEntry{
+                            bids = append(bids, types.OrderBookEntry{
                                 Price: price,
                                 Quantity: quantity,
                             })
                         } else {
-                            bids = InsertPriceInBids(bids, price, quantity)
+                            bids = util.InsertPriceInBids(bids, price, quantity)
                             bids = bids[:k.depth]
                         }
                     }
                 }
                 for _, rawOrderBookEntry := range orderBookDiffAsks["a"].([]interface{}) {
-                    price, quantity := GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
+                    price, quantity := util.GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
                     if quantity.Equal(decimal.Zero) {
-                        asks = RemovePriceFromAsks(asks, price)
+                        asks = util.RemovePriceFromAsks(asks, price)
                     } else {
                         if len(rawOrderBookEntry.([]interface{})) == 4 {
                             // it has the 4th element "r" so we just re-append
-                            asks = append(asks, DecimalOrderBookEntry{
+                            asks = append(asks, types.OrderBookEntry{
                                 Price: price,
                                 Quantity: quantity,
                             })
                         } else {
-                            asks = InsertPriceInAsks(asks, price, quantity)
+                            asks = util.InsertPriceInAsks(asks, price, quantity)
                             asks = asks[:k.depth]
                         }
                     }
                 }
                 verifyOrderBookChecksum(bids, asks, checksum)
             }
-            k.decimalOrderBooks.Store(assetPair, &DecimalOrderBook{
+            k.orderBooks.Store(assetPair, &types.OrderBook{
                 Bids: bids[:k.depth],
                 Asks: asks[:k.depth],
             })
@@ -531,37 +520,15 @@ func (k *KrakenOrderBookRecorder) processOrderBookUpdates(channelId uint, assetP
 }
 
 func (k *KrakenOrderBookRecorder) GetOrderBook(assetPair types.AssetPair) (types.OrderBook, bool) {
-    decimalOrderBook, ok := k.decimalOrderBooks.Load(assetPair)
+    orderBook, ok := k.orderBooks.Load(assetPair)
     if !ok {
         return types.OrderBook{}, false
     }
-    bids := decimalOrderBook.(*DecimalOrderBook).Bids
-    asks := decimalOrderBook.(*DecimalOrderBook).Asks
-    orderBook := types.OrderBook{
-        Bids: make([]types.OrderBookEntry, len(bids)),
-        Asks: make([]types.OrderBookEntry, len(asks)),
-    }
-    for i, decimalOrderBookEntry := range bids {
-        goodEnoughPriceFloat, _ := decimalOrderBookEntry.Price.Float64()
-        goodEnoughQuantityFloat, _ := decimalOrderBookEntry.Quantity.Float64()
-        orderBook.Bids[i] = types.OrderBookEntry{
-            Price: goodEnoughPriceFloat,
-            Quantity: goodEnoughQuantityFloat,
-        }
-    }
-    for i, decimalOrderBookEntry := range asks {
-        goodEnoughPriceFloat, _ := decimalOrderBookEntry.Price.Float64()
-        goodEnoughQuantityFloat, _ := decimalOrderBookEntry.Quantity.Float64()
-        orderBook.Asks[i] = types.OrderBookEntry{
-            Price: goodEnoughPriceFloat,
-            Quantity: goodEnoughQuantityFloat,
-        }
-    }
-    return orderBook, true
+    return *orderBook.(*types.OrderBook), true
 }
 
 func (k *KrakenOrderBookRecorder) RegisterAssetPair(assetPair types.AssetPair) {
-    if _, ok := k.decimalOrderBooks.Load(assetPair); ok {
+    if _, ok := k.orderBooks.Load(assetPair); ok {
         return
     }
 
@@ -642,28 +609,28 @@ func (k *KrakenOrderBookRecorder) RegisterAssetPair(assetPair types.AssetPair) {
             break
         }
     }
-    decimalOrderBook := &DecimalOrderBook{}
+    orderBook := &types.OrderBook{}
     rawOrderBook := resp[1].(map[string]interface{})
     for _, rawOrderBookEntry := range rawOrderBook["as"].([]interface{}) {
-        price, quantity := GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
-        decimalOrderBook.Asks = append(decimalOrderBook.Asks, DecimalOrderBookEntry{
+        price, quantity := util.GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
+        orderBook.Asks = append(orderBook.Asks, types.OrderBookEntry{
             Price: price,
             Quantity: quantity,
         })
-        if uint(len(decimalOrderBook.Asks)) == k.depth {
+        if uint(len(orderBook.Asks)) == k.depth {
             break
         }
     }
     for _, rawOrderBookEntry := range rawOrderBook["bs"].([]interface{}) {
-        price, quantity := GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
-        decimalOrderBook.Bids = append(decimalOrderBook.Bids, DecimalOrderBookEntry{
+        price, quantity := util.GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
+        orderBook.Bids = append(orderBook.Bids, types.OrderBookEntry{
             Price: price,
             Quantity: quantity,
         })
-        if uint(len(decimalOrderBook.Bids)) == k.depth {
+        if uint(len(orderBook.Bids)) == k.depth {
             break
         }
     }
-    k.decimalOrderBooks.Store(assetPair, decimalOrderBook)
+    k.orderBooks.Store(assetPair, orderBook)
     go k.processOrderBookUpdates(channelId, assetPair, channel)
 }
