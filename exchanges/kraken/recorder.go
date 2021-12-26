@@ -88,7 +88,7 @@ func (k *krakenWebSocketRecorder) record() {
 type KrakenSpreadRecorder struct {
     krakenWebSocketRecorder
     capacity                uint
-    // map[types.AssetPair]*util.FixedSizeSpreadQueue
+    // map[types.AssetPair]*util.ConcurrentFixedSizeSpreadQueue
     historicalSpreads       *sync.Map
 }
 
@@ -112,7 +112,7 @@ func NewKrakenSpreadRecorder(assetPairs []types.AssetPair, iso4217Translator typ
         log.Fatalln(err)
     }
     webSocketConnection.WriteMessage(1, payloadJson)
-    channelIdTranslator := make(map[uint]types.AssetPair)
+
     channels := &sync.Map{}
     historicalSpreads := &sync.Map{}
     var initialResponse map[string]interface{}
@@ -125,14 +125,16 @@ func NewKrakenSpreadRecorder(assetPairs []types.AssetPair, iso4217Translator typ
             // we assume here that all subscription messages come one right after another
             log.Fatalln(initialResponse)
         }
-        channelId := uint(initialResponse["channelID"].(float64))
-        assetPair := reverseIso4217Translator[initialResponse["pair"].(string)]
-        channelIdTranslator[channelId] = assetPair
-        channels.Store(channelId, make(chan []interface{}))
-        historicalSpreads.Store(assetPair, util.NewFixedSizeSpreadQueue(capacity))
+        channel := make(chan []interface{})
+        historicalSpread := util.NewConcurrentFixedSizeSpreadQueue(capacity)
+
+        channels.Store(uint(initialResponse["channelID"].(float64)), channel)
+        historicalSpreads.Store(reverseIso4217Translator[initialResponse["pair"].(string)], historicalSpread)
+
+        go processSpreadUpdates(historicalSpread, channel)
     }
 
-    krakenSpreadRecorder := &KrakenSpreadRecorder{
+    krakenWebSocketRecorder := &KrakenSpreadRecorder{
         krakenWebSocketRecorder: krakenWebSocketRecorder{
             webSocketConnection: webSocketConnection,
             iso4217Translator: iso4217Translator,
@@ -142,16 +144,12 @@ func NewKrakenSpreadRecorder(assetPairs []types.AssetPair, iso4217Translator typ
         historicalSpreads: historicalSpreads,
     }
 
-    channels.Range(func(rawChannelId, rawChannel interface{}) bool {
-        go krakenSpreadRecorder.processSpreadUpdates(rawChannelId.(uint), channelIdTranslator[rawChannelId.(uint)], rawChannel.(chan []interface{}))
-        return true
-    })
-    go krakenSpreadRecorder.record()
+    go krakenWebSocketRecorder.record()
 
-    return krakenSpreadRecorder
+    return krakenWebSocketRecorder
 }
 
-func (k *KrakenSpreadRecorder) processSpreadUpdates(channelId uint, assetPair types.AssetPair, channel chan []interface{}) {
+func processSpreadUpdates(historicalSpread *util.ConcurrentFixedSizeSpreadQueue, channel chan []interface{}) {
     for {
         select {
         case resp := <- channel:
@@ -172,11 +170,7 @@ func (k *KrakenSpreadRecorder) processSpreadUpdates(channelId uint, assetPair ty
             // fraction is in ns
             timestampTime := time.Unix(int64(timestampInteger), int64(timestampFraction * 1000000))
 
-            historicalSpread, ok := k.historicalSpreads.Load(assetPair)
-            if !ok {
-                log.Fatalf("historicalSpreads not found for assetPair %v\n", assetPair)
-            }
-            historicalSpread.(*util.FixedSizeSpreadQueue).Push(types.Spread{
+            historicalSpread.Push(types.Spread{
                 Bid: bid,
                 Ask: ask,
                 Timestamp: &timestampTime,
@@ -190,7 +184,7 @@ func (k *KrakenSpreadRecorder) GetHistoricalSpreads(assetPair types.AssetPair) (
     if !ok {
         return make([]types.Spread, 0), false
     }
-    return result.(*util.FixedSizeSpreadQueue).Data(), true
+    return result.(*util.ConcurrentFixedSizeSpreadQueue).Data(), true
 }
 
 func (k *KrakenSpreadRecorder) RegisterAssetPair(assetPair types.AssetPair) {
@@ -247,18 +241,20 @@ func (k *KrakenSpreadRecorder) RegisterAssetPair(assetPair types.AssetPair) {
         }
     }
 
-    channelId := uint(initialResponse["channelID"].(float64))
     channel := make(chan []interface{})
-    k.channels.Store(channelId, channel)
-    k.historicalSpreads.Store(assetPair, util.NewFixedSizeSpreadQueue(k.capacity))
-    go k.processSpreadUpdates(channelId, assetPair, channel)
+    historicalSpread := util.NewConcurrentFixedSizeSpreadQueue(k.capacity)
+
+    k.channels.Store(uint(initialResponse["channelID"].(float64)), channel)
+    k.historicalSpreads.Store(assetPair, historicalSpread)
+
+    go processSpreadUpdates(historicalSpread, channel)
 }
 
 // very much inspired by https://github.com/jurijbajzelj/kraken_ws_orderbook
 type KrakenOrderBookRecorder struct {
     krakenWebSocketRecorder
     depth                   uint
-    // map[types.AssetPair]*types.OrderBook
+    // map[types.AssetPair]*util.ConcurrentOrderBook
     orderBooks              *sync.Map
 }
 
@@ -285,7 +281,6 @@ func NewKrakenOrderBookRecorder(assetPairs []types.AssetPair, iso4217Translator 
     webSocketConnection.WriteMessage(1, payloadJson)
 
     channelIdTranslator := make(map[uint]types.AssetPair)
-    channels := &sync.Map{}
     var initialResponse map[string]interface{}
     for i := 0; i < len(iso4217TranslatedPairs); i++ {
         err = webSocketConnection.ReadJSON(&initialResponse)
@@ -299,10 +294,10 @@ func NewKrakenOrderBookRecorder(assetPairs []types.AssetPair, iso4217Translator 
         channelId := uint(initialResponse["channelID"].(float64))
         assetPair := reverseIso4217Translator[initialResponse["pair"].(string)]
         channelIdTranslator[channelId] = assetPair
-        channels.Store(channelId, make(chan []interface{}))
     }
 
     // get initial books
+    channels := &sync.Map{}
     orderBooks := &sync.Map{}
     var resp []interface{}
     for i := 0; i < len(iso4217TranslatedPairs); i++ {
@@ -322,31 +317,37 @@ func NewKrakenOrderBookRecorder(assetPairs []types.AssetPair, iso4217Translator 
         }
 
         // we assume here that all initial book messages come right after another
-        orderBook := &types.OrderBook{}
+        asks := make([]types.OrderBookEntry, 0)
+        bids := make([]types.OrderBookEntry, 0)
         channelId := uint(resp[0].(float64))
         rawOrderBook := resp[1].(map[string]interface{})
         for _, rawOrderBookEntry := range rawOrderBook["as"].([]interface{}) {
             price, quantity := util.GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
-            orderBook.Asks = append(orderBook.Asks, types.OrderBookEntry{
+            asks = append(asks, types.OrderBookEntry{
                 Price: price,
                 Quantity: quantity,
             })
-            if uint(len(orderBook.Asks)) == depth {
+            if uint(len(asks)) == depth {
                 break
             }
         }
         for _, rawOrderBookEntry := range rawOrderBook["bs"].([]interface{}) {
             price, quantity := util.GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
-            orderBook.Bids = append(orderBook.Bids, types.OrderBookEntry{
+            bids = append(bids, types.OrderBookEntry{
                 Price: price,
                 Quantity: quantity,
             })
-            if uint(len(orderBook.Bids)) == depth {
+            if uint(len(bids)) == depth {
                 break
             }
         }
+        concurrentOrderBook := util.NewConcurrentOrderBook(bids, asks)
 
-        orderBooks.Store(channelIdTranslator[channelId], orderBook)
+        channel := make(chan []interface{})
+
+        channels.Store(channelId, channel)
+        orderBooks.Store(channelIdTranslator[channelId], concurrentOrderBook)
+        go processOrderBookUpdates(concurrentOrderBook, channel, depth)
     }
 
     krakenOrderBookRecorder := &KrakenOrderBookRecorder{
@@ -359,10 +360,6 @@ func NewKrakenOrderBookRecorder(assetPairs []types.AssetPair, iso4217Translator 
         orderBooks: orderBooks,
     }
 
-    channels.Range(func(rawChannelId, rawChannel interface{}) bool {
-        go krakenOrderBookRecorder.processOrderBookUpdates(rawChannelId.(uint), channelIdTranslator[rawChannelId.(uint)], rawChannel.(chan []interface{}))
-        return true
-    })
     go krakenOrderBookRecorder.record()
 
     return krakenOrderBookRecorder
@@ -416,16 +413,12 @@ func verifyOrderBookChecksum(bids []types.OrderBookEntry, asks []types.OrderBook
     }
 }
 
-func (k *KrakenOrderBookRecorder) processOrderBookUpdates(channelId uint, assetPair types.AssetPair, channel chan []interface{}) {
+func processOrderBookUpdates(concurrentOrderBook *util.ConcurrentOrderBook, channel chan []interface{}, depth uint) {
     for {
         select {
         case resp := <- channel:
-            orderBook, ok := k.orderBooks.Load(assetPair)
-            if !ok {
-                log.Fatalf("orderBook not found for assetPair %v\n", assetPair)
-            }
-            bids := orderBook.(*types.OrderBook).Bids
-            asks := orderBook.(*types.OrderBook).Asks
+            bids := concurrentOrderBook.GetBids()
+            asks := concurrentOrderBook.GetAsks()
             if len(resp) == 4 {
                 // one of bids or asks is updated
                 orderBookDiff := resp[1].(map[string]interface{})
@@ -445,7 +438,7 @@ func (k *KrakenOrderBookRecorder) processOrderBookUpdates(channelId uint, assetP
                                 })
                             } else {
                                 bids = util.InsertPriceInBids(bids, price, quantity)
-                                bids = bids[:k.depth]
+                                bids = bids[:depth]
                             }
                         }
                     }
@@ -463,7 +456,7 @@ func (k *KrakenOrderBookRecorder) processOrderBookUpdates(channelId uint, assetP
                                 })
                             } else {
                                 asks = util.InsertPriceInAsks(asks, price, quantity)
-                                asks = asks[:k.depth]
+                                asks = asks[:depth]
                             }
                         }
                     }
@@ -488,7 +481,7 @@ func (k *KrakenOrderBookRecorder) processOrderBookUpdates(channelId uint, assetP
                             })
                         } else {
                             bids = util.InsertPriceInBids(bids, price, quantity)
-                            bids = bids[:k.depth]
+                            bids = bids[:depth]
                         }
                     }
                 }
@@ -505,26 +498,23 @@ func (k *KrakenOrderBookRecorder) processOrderBookUpdates(channelId uint, assetP
                             })
                         } else {
                             asks = util.InsertPriceInAsks(asks, price, quantity)
-                            asks = asks[:k.depth]
+                            asks = asks[:depth]
                         }
                     }
                 }
                 verifyOrderBookChecksum(bids, asks, checksum)
             }
-            k.orderBooks.Store(assetPair, &types.OrderBook{
-                Bids: bids[:k.depth],
-                Asks: asks[:k.depth],
-            })
+            concurrentOrderBook.SetBidsAndAsks(bids[:depth], asks[:depth])
         }
     }
 }
 
 func (k *KrakenOrderBookRecorder) GetOrderBook(assetPair types.AssetPair) (types.OrderBook, bool) {
-    orderBook, ok := k.orderBooks.Load(assetPair)
+    result, ok := k.orderBooks.Load(assetPair)
     if !ok {
         return types.OrderBook{}, false
     }
-    return *orderBook.(*types.OrderBook), true
+    return result.(*util.ConcurrentOrderBook).Data(), true
 }
 
 func (k *KrakenOrderBookRecorder) RegisterAssetPair(assetPair types.AssetPair) {
@@ -584,6 +574,7 @@ func (k *KrakenOrderBookRecorder) RegisterAssetPair(assetPair types.AssetPair) {
 
     channelId := uint(initialResponse["channelID"].(float64))
     channel := make(chan []interface{})
+
     k.channels.Store(channelId, channel)
 
     // get initial book
@@ -609,28 +600,32 @@ func (k *KrakenOrderBookRecorder) RegisterAssetPair(assetPair types.AssetPair) {
             break
         }
     }
-    orderBook := &types.OrderBook{}
+    asks := make([]types.OrderBookEntry, 0)
+    bids := make([]types.OrderBookEntry, 0)
     rawOrderBook := resp[1].(map[string]interface{})
     for _, rawOrderBookEntry := range rawOrderBook["as"].([]interface{}) {
         price, quantity := util.GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
-        orderBook.Asks = append(orderBook.Asks, types.OrderBookEntry{
+        asks = append(asks, types.OrderBookEntry{
             Price: price,
             Quantity: quantity,
         })
-        if uint(len(orderBook.Asks)) == k.depth {
+        if uint(len(asks)) == k.depth {
             break
         }
     }
     for _, rawOrderBookEntry := range rawOrderBook["bs"].([]interface{}) {
         price, quantity := util.GetPriceAndQuantity(rawOrderBookEntry.([]interface{}))
-        orderBook.Bids = append(orderBook.Bids, types.OrderBookEntry{
+        bids = append(bids, types.OrderBookEntry{
             Price: price,
             Quantity: quantity,
         })
-        if uint(len(orderBook.Bids)) == k.depth {
+        if uint(len(bids)) == k.depth {
             break
         }
     }
-    k.orderBooks.Store(assetPair, orderBook)
-    go k.processOrderBookUpdates(channelId, assetPair, channel)
+    concurrentOrderBook := util.NewConcurrentOrderBook(bids, asks)
+
+    k.orderBooks.Store(assetPair, concurrentOrderBook)
+
+    go processOrderBookUpdates(concurrentOrderBook, channel, k.depth)
 }
