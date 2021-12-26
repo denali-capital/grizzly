@@ -4,12 +4,10 @@ import (
     "crypto/hmac"
     "crypto/sha256"
     "fmt"
-    "io/ioutil"
     "log"
     "net/http"
     "net/url"
     "strconv"
-    "strings"
     "time"
 
     "github.com/denali-capital/grizzly/types"
@@ -25,7 +23,8 @@ type BinanceUS struct {
 
     apiKey                   string
     secretKey                string
-    spreadRecorder           *util.SpreadRecorder
+    spreadRecorder           types.SpreadRecorder
+    orderBookRecorder        types.OrderBookRecorder
     latencyEstimator         *util.EwmaEstimator
     orderIdToOrderTranslator *util.ConcurrentOrderIdToOrderPtrMap
     // add timeouts
@@ -34,27 +33,15 @@ type BinanceUS struct {
 
 func NewBinanceUS(apiKey, secretKey string, assetPairTranslator types.AssetPairTranslator) *BinanceUS {
     assetPairs := assetPairTranslator.GetAssetPairs()
-    binanceUS := &BinanceUS{
+    return &BinanceUS{
         AssetPairTranslator: assetPairTranslator,
         apiKey: apiKey,
         secretKey: secretKey,
+        spreadRecorder: NewBinanceUSSpreadRecorder(assetPairs, assetPairTranslator, 200),
         latencyEstimator: util.NewEwmaEstimator(0.125, 0.25, 4),
         orderIdToOrderTranslator: util.NewConcurrentOrderIdToOrderPtrMap(),
         httpClient: &http.Client{},
     }
-    // parameterize capacity and period?
-    binanceUS.spreadRecorder = util.NewSpreadRecorder(
-        assetPairs,
-        func(assetPair types.AssetPair)types.Spread{
-            spread := binanceUS.GetCurrentSpread(assetPair)
-            currentTime := time.Now()
-            spread.Timestamp = &currentTime
-            return spread
-        },
-        200,
-        time.Duration(200) * time.Millisecond,
-    )
-    return binanceUS
 }
 
 func (b *BinanceUS) String() string {
@@ -125,7 +112,7 @@ func (b *BinanceUS) getOrderBook(assetPair types.AssetPair, channel chan types.O
     }))
     b.checkError(bodyJson)
 
-    orderBook := types.OrderBook{}
+    orderBook := &types.OrderBook{}
     for _, rawOrderBookEntry := range bodyJson["asks"].([]interface{}) {
         price, err := decimal.NewFromString(rawOrderBookEntry.([]interface{})[0].(string))
         if err != nil {
@@ -157,14 +144,13 @@ func (b *BinanceUS) getOrderBook(assetPair types.AssetPair, channel chan types.O
     channel <- types.OrderBookResponse{assetPair, orderBook}
 }
 
-// remember that I changed it to return a pointer to OrderBook now!!!!
 func (b *BinanceUS) GetOrderBooks(assetPairs []types.AssetPair) map[types.AssetPair]*types.OrderBook {
     channel := make(chan types.OrderBookResponse)
     for _, assetPair := range assetPairs {
         go b.getOrderBook(assetPair, channel)
     }
 
-    orderBooks := make(map[types.AssetPair]types.OrderBook)
+    orderBooks := make(map[types.AssetPair]*types.OrderBook)
     for i := 0; i < len(assetPairs); i++ {
         response := <- channel
         orderBooks[response.AssetPair] = response.OrderBook
@@ -220,11 +206,11 @@ func (b *BinanceUS) executeOrder(order types.Order, channel chan types.OrderIdRe
     bodyJson := util.DoHttpAndGetBody(b.httpClient, request)
     b.checkError(bodyJson)
 
-    id := bodyJson["orderId"].(uint)
+    orderId := types.OrderId(strconv.FormatUint(uint64(bodyJson["orderId"].(uint)), 10))
 
-    b.orderIdToOrderTranslator.Store(types.OrderId(id), &order)
+    b.orderIdToOrderTranslator.Store(orderId, &order)
 
-    channel <- types.OrderIdResponse{order, types.OrderId(id)}
+    channel <- types.OrderIdResponse{order, orderId}
 }
 
 func (b *BinanceUS) ExecuteOrders(orders []types.Order) map[types.Order]types.OrderId {
@@ -244,7 +230,7 @@ func (b *BinanceUS) ExecuteOrders(orders []types.Order) map[types.Order]types.Or
 func (b *BinanceUS) getOrderStatus(orderId types.OrderId, channel chan types.OrderStatusResponse) {
     order, ok := b.orderIdToOrderTranslator.Load(orderId)
     if !ok {
-        log.Fatalln("order with id %v not found", orderId)
+        log.Fatalf("order with id %v not found\n", orderId)
     }
     queryParams := url.Values{
         "symbol": []string{b.AssetPairTranslator[order.AssetPair]},
@@ -302,7 +288,7 @@ func (b *BinanceUS) getOrderStatus(orderId types.OrderId, channel chan types.Ord
         orderStatus.Status = types.Expired
         b.orderIdToOrderTranslator.Delete(orderId)
     case "REJECTED":
-        log.Fatalln("order %v was rejected by BinanceUS", *order)
+        log.Fatalf("order %v was rejected by BinanceUS\n", *order)
     }
 
     channel <- types.OrderStatusResponse{orderId, orderStatus}
@@ -325,7 +311,7 @@ func (b *BinanceUS) GetOrderStatuses(orderIds []types.OrderId) map[types.OrderId
 func (b *BinanceUS) cancelOrder(orderId types.OrderId) {
     order, ok := b.orderIdToOrderTranslator.Load(orderId)
     if !ok {
-        log.Fatalln("order with id %v not found", orderId)
+        log.Fatalf("order with id %v not found\n", orderId)
     }
     queryParams := url.Values{
         "symbol": []string{b.AssetPairTranslator[order.AssetPair]},
