@@ -38,3 +38,5 @@ const SampleDuration time.Duration = 2 * time.Second
 const LatencyDuration time.Duration = time.Second
 
 const Samples uint = 10
+
+const SecretKeySuffix string = "_SECRET_KEY"

@@ -13,7 +13,7 @@ import (
     "github.com/denali-capital/grizzly/model/nn"
     "github.com/denali-capital/grizzly/types"
     "github.com/denali-capital/grizzly/util"
-    "github.com/joho/godotenv"
+    _ "github.com/joho/godotenv/autoload"
 )
 
 // each exchange will have their own module that implements Exchange interface above
@@ -87,11 +87,6 @@ func main() {
                 translator[i + 1] = assetPairSpecific
             }
         }
-    }
-
-    err := godotenv.Load()
-    if err != nil {
-        log.Fatalln("Error loading .env file", err)
     }
 
     exchanges := make([]*Exchange, len(allowedExchanges))

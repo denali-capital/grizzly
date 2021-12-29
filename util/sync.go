@@ -74,7 +74,8 @@ func (c *ConcurrentFixedSizeSpreadQueue) Data() []types.Spread {
 
 type ConcurrentOrderBook struct {
     sync.RWMutex
-    internal types.OrderBook
+    internal     types.OrderBook
+    LastUpdateId uint
 }
 
 func NewConcurrentOrderBook(bids []types.OrderBookEntry, asks []types.OrderBookEntry) *ConcurrentOrderBook {
@@ -101,6 +102,57 @@ func (c *ConcurrentOrderBook) GetBids() []types.OrderBookEntry {
 func (c *ConcurrentOrderBook) SetBidsAndAsks(bids []types.OrderBookEntry, asks []types.OrderBookEntry) {
     c.Lock()
     defer c.Unlock()
+    c.internal.Bids = bids
+    c.internal.Asks = asks
+}
+
+func filterUpdateId(updateId uint) func(types.OrderBookEntry) bool {
+    return func(orderBookEntry types.OrderBookEntry) bool {
+        return orderBookEntry.UpdateId > updateId
+    }
+}
+
+func (c *ConcurrentOrderBook) FilterAndMerge(other *ConcurrentOrderBook, prefer bool) {
+    c.Lock()
+    defer c.Unlock()
+    filteredBids := FilterOrderBookEntries(c.internal.Bids, filterUpdateId(other.LastUpdateId))
+    filteredAsks := FilterOrderBookEntries(c.internal.Asks, filterUpdateId(other.LastUpdateId))
+
+    var bids []types.OrderBookEntry
+    var asks []types.OrderBookEntry
+    if prefer {
+        bids = other.GetBids()
+        bids = append(bids, filteredBids...)
+        asks = other.GetAsks()
+        asks = append(asks, filteredAsks...)
+    } else {
+        bids = filteredBids
+        bids = append(bids, other.GetBids()...)
+        asks = filteredAsks
+        asks = append(asks, other.GetAsks()...)
+    }
+    processed := make(map[string]struct{})
+    w := 0
+    for _, orderBookEntry := range bids {
+        priceIdentifier := orderBookEntry.Price.String()
+        if _, exists := processed[priceIdentifier]; !exists {
+            processed[priceIdentifier] = struct{}{}
+            bids[w] = orderBookEntry
+            w++
+        }
+    }
+    bids = bids[:w]
+    processed = make(map[string]struct{})
+    w = 0
+    for _, orderBookEntry := range asks {
+        priceIdentifier := orderBookEntry.Price.String()
+        if _, exists := processed[priceIdentifier]; !exists {
+            processed[priceIdentifier] = struct{}{}
+            asks[w] = orderBookEntry
+            w++
+        }
+    }
+    asks = asks[:w]
     c.internal.Bids = bids
     c.internal.Asks = asks
 }

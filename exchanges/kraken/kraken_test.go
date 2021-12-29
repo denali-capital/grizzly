@@ -2,18 +2,23 @@ package kraken
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	grizzlytesting "github.com/denali-capital/grizzly/testing"
+	"github.com/joho/godotenv"
 )
 
 const apiKey string = "c8Mrlv+qder9EzFm+1trJRthtsYzgSBYHNP8opkB0O5FR+gS3UY52ex0"
-const secretKey string = "B/8Kf+5NdjqHMRrByJa/nd9QByUzfgVt1ZsagcsNbhlLjGs1tht7VBwiH6sCl83O8k6/cBdS0sblWkITrHglDA=="
 
 // TODO: test use data stuff
 func TestKraken(t *testing.T) {
-	kraken := NewKraken(apiKey, secretKey, grizzlytesting.KrakenAssetPairTranslator, grizzlytesting.Iso4217Translator)
+	err := godotenv.Load("../../.env")
+    if err != nil {
+        t.Fatalf("Error loading .env file\n%v\n", err)
+    }
+	kraken := NewKraken(apiKey, os.Getenv("KRAKEN" + grizzlytesting.SecretKeySuffix), grizzlytesting.KrakenAssetPairTranslator, grizzlytesting.Iso4217Translator)
 	time.Sleep(grizzlytesting.SleepDuration)
 	t.Run("GetHistoricalSpreads", func(t *testing.T) {
 		testKrakenGetHistoricalSpreads(t, kraken)

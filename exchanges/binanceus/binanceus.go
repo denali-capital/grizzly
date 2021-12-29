@@ -33,14 +33,16 @@ type BinanceUS struct {
 
 func NewBinanceUS(apiKey, secretKey string, assetPairTranslator types.AssetPairTranslator) *BinanceUS {
     assetPairs := assetPairTranslator.GetAssetPairs()
+    httpClient := &http.Client{}
     return &BinanceUS{
         AssetPairTranslator: assetPairTranslator,
         apiKey: apiKey,
         secretKey: secretKey,
         spreadRecorder: NewBinanceUSSpreadRecorder(assetPairs, assetPairTranslator, 200),
+        orderBookRecorder: NewBinanceUSOrderBookRecorder(httpClient, assetPairs, assetPairTranslator, 1000),
         latencyEstimator: util.NewEwmaEstimator(0.125, 0.25, 4),
         orderIdToOrderTranslator: util.NewConcurrentOrderIdToOrderPtrMap(),
-        httpClient: &http.Client{},
+        httpClient: httpClient,
     }
 }
 
@@ -107,41 +109,11 @@ func (b *BinanceUS) GetCurrentSpread(assetPair types.AssetPair) types.Spread {
 }
 
 func (b *BinanceUS) getOrderBook(assetPair types.AssetPair, channel chan types.OrderBookResponse) {
-    bodyJson := util.HttpGetAndGetBody(b.httpClient, util.ParseUrlWithQuery(RESTEndpoint + "/api/v3/depth", url.Values{
-        "symbol": []string{b.AssetPairTranslator[assetPair]},
-    }))
-    b.checkError(bodyJson)
-
-    orderBook := &types.OrderBook{}
-    for _, rawOrderBookEntry := range bodyJson["asks"].([]interface{}) {
-        price, err := decimal.NewFromString(rawOrderBookEntry.([]interface{})[0].(string))
-        if err != nil {
-            log.Fatalln(err)
-        }
-        quantity, err := decimal.NewFromString(rawOrderBookEntry.([]interface{})[1].(string))
-        if err != nil {
-            log.Fatalln(err)
-        }
-        orderBook.Asks = append(orderBook.Asks, types.OrderBookEntry{
-            Price: price,
-            Quantity: quantity,
-        })
+    orderBook, ok := b.orderBookRecorder.GetOrderBook(assetPair)
+    if !ok {
+        b.orderBookRecorder.RegisterAssetPair(assetPair)
     }
-    for _, rawOrderBookEntry := range bodyJson["bids"].([]interface{}) {
-        price, err := decimal.NewFromString(rawOrderBookEntry.([]interface{})[0].(string))
-        if err != nil {
-            log.Fatalln(err)
-        }
-        quantity, err := decimal.NewFromString(rawOrderBookEntry.([]interface{})[1].(string))
-        if err != nil {
-            log.Fatalln(err)
-        }
-        orderBook.Bids = append(orderBook.Bids, types.OrderBookEntry{
-            Price: price,
-            Quantity: quantity,
-        })
-    }
-    channel <- types.OrderBookResponse{assetPair, orderBook}
+    channel <- types.OrderBookResponse{assetPair, &orderBook}
 }
 
 func (b *BinanceUS) GetOrderBooks(assetPairs []types.AssetPair) map[types.AssetPair]*types.OrderBook {

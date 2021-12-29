@@ -437,7 +437,10 @@ func processOrderBookUpdates(concurrentOrderBook *util.ConcurrentOrderBook, chan
                                     Quantity: quantity,
                                 })
                             } else {
-                                bids = util.InsertPriceInBids(bids, price, quantity)
+                                bids = util.InsertPriceInBids(bids, types.OrderBookEntry{
+                                    Price: price,
+                                    Quantity: quantity,
+                                })
                                 bids = bids[:depth]
                             }
                         }
@@ -455,7 +458,10 @@ func processOrderBookUpdates(concurrentOrderBook *util.ConcurrentOrderBook, chan
                                     Quantity: quantity,
                                 })
                             } else {
-                                asks = util.InsertPriceInAsks(asks, price, quantity)
+                                asks = util.InsertPriceInAsks(asks, types.OrderBookEntry{
+                                    Price: price,
+                                    Quantity: quantity,
+                                })
                                 asks = asks[:depth]
                             }
                         }
@@ -480,7 +486,10 @@ func processOrderBookUpdates(concurrentOrderBook *util.ConcurrentOrderBook, chan
                                 Quantity: quantity,
                             })
                         } else {
-                            bids = util.InsertPriceInBids(bids, price, quantity)
+                            bids = util.InsertPriceInBids(bids, types.OrderBookEntry{
+                                Price: price,
+                                Quantity: quantity,
+                            })
                             bids = bids[:depth]
                         }
                     }
@@ -497,7 +506,10 @@ func processOrderBookUpdates(concurrentOrderBook *util.ConcurrentOrderBook, chan
                                 Quantity: quantity,
                             })
                         } else {
-                            asks = util.InsertPriceInAsks(asks, price, quantity)
+                            asks = util.InsertPriceInAsks(asks, types.OrderBookEntry{
+                                Price: price,
+                                Quantity: quantity,
+                            })
                             asks = asks[:depth]
                         }
                     }

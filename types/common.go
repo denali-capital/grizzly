@@ -72,6 +72,7 @@ type OrderBook struct {
 type OrderBookEntry struct {
     Price    decimal.Decimal
     Quantity decimal.Decimal
+    UpdateId uint
 }
 
 type Observation struct {

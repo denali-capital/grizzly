@@ -36,18 +36,18 @@ func RemovePriceFromBids(bids []types.OrderBookEntry, price decimal.Decimal) []t
 	}
 }
 
-func InsertPriceInBids(bids []types.OrderBookEntry, price decimal.Decimal, quantity decimal.Decimal) []types.OrderBookEntry {
-	bids = RemovePriceFromBids(bids, price)
-	orderBookEntry := types.OrderBookEntry{
-		Price: price,
-		Quantity: quantity,
-	}
+func InsertPriceInBids(bids []types.OrderBookEntry, orderBookEntry types.OrderBookEntry) []types.OrderBookEntry {
+	bids = RemovePriceFromBids(bids, orderBookEntry.Price)
 	i := sort.Search(len(bids), func(i int) bool {
-		return bids[i].Price.LessThan(price)
+		return bids[i].Price.LessThan(orderBookEntry.Price)
 	})
-	bids = append(bids, types.OrderBookEntry{})
-	copy(bids[i + 1:], bids[i:])
-	bids[i] = orderBookEntry
+	if i > 0 && bids[i - 1].Price.Equal(orderBookEntry.Price) {
+		bids[i - 1] = orderBookEntry
+	} else {
+		bids = append(bids, types.OrderBookEntry{})
+		copy(bids[i + 1:], bids[i:])
+		bids[i] = orderBookEntry
+	}
 	return bids
 }
 
@@ -62,17 +62,17 @@ func RemovePriceFromAsks(asks []types.OrderBookEntry, price decimal.Decimal) []t
 	}
 }
 
-func InsertPriceInAsks(asks []types.OrderBookEntry, price decimal.Decimal, quantity decimal.Decimal) []types.OrderBookEntry {
-	asks = RemovePriceFromAsks(asks, price)
-	orderBookEntry := types.OrderBookEntry{
-		Price: price,
-		Quantity: quantity,
-	}
+func InsertPriceInAsks(asks []types.OrderBookEntry, orderBookEntry types.OrderBookEntry) []types.OrderBookEntry {
+	asks = RemovePriceFromAsks(asks, orderBookEntry.Price)
 	i := sort.Search(len(asks), func(i int) bool {
-		return asks[i].Price.GreaterThan(price)
+		return asks[i].Price.GreaterThan(orderBookEntry.Price)
 	})
-	asks = append(asks, types.OrderBookEntry{})
-	copy(asks[i + 1:], asks[i:])
-	asks[i] = orderBookEntry
+	if i > 0 && asks[i - 1].Price.Equal(orderBookEntry.Price) {
+		asks[i - 1] = orderBookEntry
+	} else {
+		asks = append(asks, types.OrderBookEntry{})
+		copy(asks[i + 1:], asks[i:])
+		asks[i] = orderBookEntry
+	}
 	return asks
 }
