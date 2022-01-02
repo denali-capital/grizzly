@@ -37,6 +37,7 @@ type binanceUSWebSocketRecorder struct {
     id                  uint
 }
 
+// might be problems with holding a ws connection over 24 hours
 func (b *binanceUSWebSocketRecorder) record() {
     var resp map[string]interface{}
     for {
@@ -222,9 +223,7 @@ func getOrderBookSnapshot(httpClient *http.Client, assetPair types.AssetPair, as
         "symbol": []string{assetPairTranslator[assetPair]},
         "limit": []string{strconv.FormatUint(uint64(limit), 10)},
     }))
-    if _, ok := bodyJson["code"]; ok {
-        log.Fatalln(bodyJson)
-    }
+    CheckError(bodyJson)
 
     lastUpdateId := uint(bodyJson["lastUpdateId"].(float64))
     asks := make([]types.OrderBookEntry, 0)

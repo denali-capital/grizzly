@@ -8,8 +8,10 @@ import (
 
 const (
 	BTCUSD types.AssetPair = iota
+	ETHUSDT
 	ADAUSDT
 	BTCUSDC
+	LTCUSDC
 	DOGEUSD
 )
 
@@ -31,6 +33,14 @@ var KrakenAssetPairTranslator types.AssetPairTranslator = types.AssetPairTransla
 	ADAUSDT: "ADAUSDT",
 	BTCUSDC: "XBTUSDC",
 	DOGEUSD: "XDGUSD",
+}
+
+var KuCoinAssetPairs []types.AssetPair = []types.AssetPair{ETHUSDT, ADAUSDT, LTCUSDC}
+var KuCoinAssetPairTranslator types.AssetPairTranslator = types.AssetPairTranslator{
+	ETHUSDT: "ETH-USDT",
+	ADAUSDT: "ADA-USDT",
+	BTCUSDC: "BTC-USDC",
+	LTCUSDC: "LTC-USDC",
 }
 
 const SleepDuration time.Duration = 3 * time.Second

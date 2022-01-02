@@ -8,6 +8,7 @@ import (
 
     "github.com/denali-capital/grizzly/exchanges/binanceus"
     "github.com/denali-capital/grizzly/exchanges/kraken"
+    "github.com/denali-capital/grizzly/exchanges/kucoin"
 
     "github.com/denali-capital/grizzly/model/bootstrap"
     "github.com/denali-capital/grizzly/model/nn"
@@ -102,6 +103,12 @@ func main() {
             exchanges[i] = binanceus.NewBinanceUS(apiKey, secretKey, assetPairTranslators["BinanceUS"])
         case "Kraken":
             exchanges[i] = kraken.NewKraken(apiKey, secretKey, assetPairTranslators["Kraken"], assetPairTranslators["ISO4217"])
+        case "KuCoin":
+            apiPassphrase := os.Getenv("KUCOIN_API_PASSPHRASE")
+            if apiPassphrase = "" {
+                log.Fatalln("KuCoin API Passphrase not provided")
+            }
+            exchanges[i] = kucoin.NewKuCoin(apiKey, secretKey, apiPassphrase, assetPairTranslators["KuCoin"])
         default:
             log.Fatalln("Exchange implementation not found for %v", exchangeName)
         }
