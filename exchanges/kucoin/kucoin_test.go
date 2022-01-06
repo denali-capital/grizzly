@@ -26,9 +26,9 @@ func TestKuCoin(t *testing.T) {
 	t.Run("GetCurrentSpread", func(t *testing.T) {
 		testGetCurrentSpread(t, kuCoin)
 	})
-	// t.Run("GetOrderBooks", func(t *testing.T) {
-	// 	testGetOrderBooks(t, kuCoin)
-	// })
+	t.Run("GetOrderBooks", func(t *testing.T) {
+		testGetOrderBooks(t, kuCoin)
+	})
 	t.Run("GetLatency", func(t *testing.T) {
 		testGetLatency(t, kuCoin)
 	})
@@ -56,15 +56,15 @@ func testGetCurrentSpread(t *testing.T, kuCoin *KuCoin) {
 	fmt.Println(spread)
 }
 
-// func testGetOrderBooks(t *testing.T, kuCoin *KuCoin) {
-// 	orderBooks := kuCoin.GetOrderBooks(grizzlytesting.AssetPairs)
-// 	if len(orderBooks) == 0 {
-// 		t.Fatalf("OrderBooks should not be empty")
-// 	}
-// 	for assetPair, orderBook := range orderBooks {
-// 		fmt.Printf("%v: %v\n", grizzlytesting.KuCoinAssetPairTranslator[assetPair], *orderBook)
-// 	}
-// }
+func testGetOrderBooks(t *testing.T, kuCoin *KuCoin) {
+	orderBooks := kuCoin.GetOrderBooks(grizzlytesting.KuCoinAssetPairs)
+	if len(orderBooks) == 0 {
+		t.Fatalf("OrderBooks should not be empty")
+	}
+	for assetPair, orderBook := range orderBooks {
+		fmt.Printf("%v: %v\n", grizzlytesting.KuCoinAssetPairTranslator[assetPair], *orderBook)
+	}
+}
 
 func testGetLatency(t *testing.T, kuCoin *KuCoin) {
 	latency := kuCoin.GetLatency()

@@ -50,7 +50,7 @@ func (b *BinanceUS) String() string {
     return "BinanceUS"
 }
 
-func CheckError(bodyJson map[string]interface{}) {
+func checkError(bodyJson map[string]interface{}) {
     if _, ok := bodyJson["code"]; ok {
         log.Fatalln(bodyJson)
     }
@@ -91,7 +91,7 @@ func (b *BinanceUS) GetCurrentSpread(assetPair types.AssetPair) types.Spread {
     bodyJson := util.HttpGetAndGetBody(b.httpClient, util.ParseUrlWithQuery(RESTEndpoint + "/api/v3/ticker/bookTicker", url.Values{
         "symbol": []string{b.AssetPairTranslator[assetPair]},
     }))
-    CheckError(bodyJson)
+    checkError(bodyJson)
 
     bid, err := decimal.NewFromString(bodyJson["bidPrice"].(string))
     if err != nil {
@@ -134,7 +134,7 @@ func (b *BinanceUS) GetLatency() time.Duration {
     start := time.Now()
 
     bodyJson := util.HttpGetAndGetBody(b.httpClient, RESTEndpoint + "/api/v3/ping")
-    CheckError(bodyJson)
+    checkError(bodyJson)
 
     duration := time.Since(start)
 
@@ -176,7 +176,7 @@ func (b *BinanceUS) executeOrder(order types.Order, channel chan types.OrderIdRe
     request.Header.Set("X-MBX-APIKEY", b.apiKey)
 
     bodyJson := util.DoHttpAndGetBody(b.httpClient, request)
-    CheckError(bodyJson)
+    checkError(bodyJson)
 
     orderId := types.OrderId(strconv.FormatUint(uint64(bodyJson["orderId"].(float64)), 10))
 
@@ -219,7 +219,7 @@ func (b *BinanceUS) getOrderStatus(orderId types.OrderId, channel chan types.Ord
     request.Header.Set("X-MBX-APIKEY", b.apiKey)
 
     bodyJson := util.DoHttpAndGetBody(b.httpClient, request)
-    CheckError(bodyJson)
+    checkError(bodyJson)
 
     orderStatus := types.OrderStatus{
         Original: order,
@@ -300,7 +300,7 @@ func (b *BinanceUS) cancelOrder(orderId types.OrderId) {
     request.Header.Set("X-MBX-APIKEY", b.apiKey)
 
     bodyJson := util.DoHttpAndGetBody(b.httpClient, request)
-    CheckError(bodyJson)
+    checkError(bodyJson)
 
     b.orderIdToOrderTranslator.Delete(orderId)
 }
@@ -325,7 +325,7 @@ func (b *BinanceUS) GetBalances() map[types.Asset]decimal.Decimal {
     request.Header.Set("X-MBX-APIKEY", b.apiKey)
 
     bodyJson := util.DoHttpAndGetBody(b.httpClient, request)
-    CheckError(bodyJson)
+    checkError(bodyJson)
 
     balances := make(map[types.Asset]decimal.Decimal)
     for _, rawData := range bodyJson["balances"].([]interface{}) {

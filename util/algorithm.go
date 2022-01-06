@@ -123,16 +123,6 @@ func MapCopy(m map[string]interface{}) map[string]interface{} {
     return tmp
 }
 
-func FilterOrderBookEntries(side []types.OrderBookEntry, test func(types.OrderBookEntry) bool) []types.OrderBookEntry {
-    res := make([]types.OrderBookEntry, 0)
-    for _, orderBookEntry := range side {
-        if test(orderBookEntry) {
-            res = append(res, orderBookEntry)
-        }
-    }
-    return res
-}
-
 func MinUint(a, b uint) uint {
     if a < b {
         return a

@@ -106,50 +106,47 @@ func (c *ConcurrentOrderBook) SetBidsAndAsks(bids []types.OrderBookEntry, asks [
     c.internal.Asks = asks
 }
 
-func filterUpdateId(updateId uint) func(types.OrderBookEntry) bool {
-    return func(orderBookEntry types.OrderBookEntry) bool {
-        return orderBookEntry.UpdateId > updateId
-    }
-}
-
 func (c *ConcurrentOrderBook) FilterAndMerge(other *ConcurrentOrderBook, prefer bool) {
     c.Lock()
     defer c.Unlock()
-    filteredBids := FilterOrderBookEntries(c.internal.Bids, filterUpdateId(other.LastUpdateId))
-    filteredAsks := FilterOrderBookEntries(c.internal.Asks, filterUpdateId(other.LastUpdateId))
+    lastUpdateId := other.LastUpdateId
 
     var bids []types.OrderBookEntry
     var asks []types.OrderBookEntry
     if prefer {
         bids = other.GetBids()
-        bids = append(bids, filteredBids...)
+        bids = append(bids, c.internal.Bids...)
         asks = other.GetAsks()
-        asks = append(asks, filteredAsks...)
+        asks = append(asks, c.internal.Asks...)
     } else {
-        bids = filteredBids
+        bids = c.internal.Bids
         bids = append(bids, other.GetBids()...)
-        asks = filteredAsks
+        asks = c.internal.Asks
         asks = append(asks, other.GetAsks()...)
     }
     processed := make(map[string]struct{})
     w := 0
     for _, orderBookEntry := range bids {
-        priceIdentifier := orderBookEntry.Price.String()
-        if _, exists := processed[priceIdentifier]; !exists {
-            processed[priceIdentifier] = struct{}{}
-            bids[w] = orderBookEntry
-            w++
+        if orderBookEntry.UpdateId > lastUpdateId {
+            priceIdentifier := orderBookEntry.Price.String()
+            if _, exists := processed[priceIdentifier]; !exists {
+                processed[priceIdentifier] = struct{}{}
+                bids[w] = orderBookEntry
+                w++
+            }
         }
     }
     bids = bids[:w]
     processed = make(map[string]struct{})
     w = 0
     for _, orderBookEntry := range asks {
-        priceIdentifier := orderBookEntry.Price.String()
-        if _, exists := processed[priceIdentifier]; !exists {
-            processed[priceIdentifier] = struct{}{}
-            asks[w] = orderBookEntry
-            w++
+        if orderBookEntry.UpdateId > lastUpdateId {
+            priceIdentifier := orderBookEntry.Price.String()
+            if _, exists := processed[priceIdentifier]; !exists {
+                processed[priceIdentifier] = struct{}{}
+                asks[w] = orderBookEntry
+                w++
+            }
         }
     }
     asks = asks[:w]
@@ -161,4 +158,9 @@ func (c *ConcurrentOrderBook) Data() types.OrderBook {
     c.RLock()
     defer c.RUnlock()
     return c.internal
+}
+
+type ConcurrentOrderBookResponse struct {
+    AssetPair           types.AssetPair
+    ConcurrentOrderBook *ConcurrentOrderBook
 }

@@ -44,6 +44,7 @@ func NewKuCoin(apiKey, secretKey, apiPassphrase string, assetPairTranslator type
         secretKey: secretKey,
         apiPassphrase: apiPassphrase,
         spreadRecorder: NewKuCoinSpreadRecorder(httpClient, assetPairs, assetPairTranslator, 200),
+        orderBookRecorder: NewKuCoinOrderBookRecorder(httpClient, apiKey, secretKey, apiPassphrase, assetPairs, assetPairTranslator, 1000),
         latencyEstimator: util.NewEwmaEstimator(0.125, 0.25, 4),
         orderIdToOrderTranslator: util.NewConcurrentOrderIdToOrderPtrMap(),
         httpClient: httpClient,
@@ -54,7 +55,7 @@ func (k *KuCoin) String() string {
     return "KuCoin"
 }
 
-func CheckError(bodyJson map[string]interface{}) {
+func checkError(bodyJson map[string]interface{}) {
     if bodyJson["code"].(string) != "200000" {
         log.Fatalln(bodyJson)
     }
@@ -95,7 +96,7 @@ func (k *KuCoin) GetCurrentSpread(assetPair types.AssetPair) types.Spread {
     bodyJson := util.HttpGetAndGetBody(k.httpClient, util.ParseUrlWithQuery(RESTEndpoint + "/api/v1/market/orderbook/level1", url.Values{
         "symbol": []string{k.AssetPairTranslator[assetPair]},
     }))
-    CheckError(bodyJson)
+    checkError(bodyJson)
 
     data := bodyJson["data"].(map[string]interface{})
     bid, err := decimal.NewFromString(data["bestBid"].(string))
@@ -113,33 +114,33 @@ func (k *KuCoin) GetCurrentSpread(assetPair types.AssetPair) types.Spread {
     }
 }
 
-// func (k *KuCoin) getOrderBook(assetPair types.AssetPair, channel chan types.OrderBookResponse) {
-//     orderBook, ok := k.orderBookRecorder.GetOrderBook(assetPair)
-//     if !ok {
-//         k.orderBookRecorder.RegisterAssetPair(assetPair)
-//     }
-//     channel <- types.OrderBookResponse{assetPair, &orderBook}
-// }
-// 
-// func (k *KuCoin) GetOrderBooks(assetPairs []types.AssetPair) map[types.AssetPair]*types.OrderBook {
-//     channel := make(chan types.OrderBookResponse)
-//     for _, assetPair := range assetPairs {
-//         go k.getOrderBook(assetPair, channel)
-//     }
-// 
-//     orderBooks := make(map[types.AssetPair]*types.OrderBook)
-//     for i := 0; i < len(assetPairs); i++ {
-//         response := <- channel
-//         orderBooks[response.AssetPair] = response.OrderBook
-//     }
-//     return orderBooks
-// }
+func (k *KuCoin) getOrderBook(assetPair types.AssetPair, channel chan types.OrderBookResponse) {
+    orderBook, ok := k.orderBookRecorder.GetOrderBook(assetPair)
+    if !ok {
+        k.orderBookRecorder.RegisterAssetPair(assetPair)
+    }
+    channel <- types.OrderBookResponse{assetPair, &orderBook}
+}
+ 
+func (k *KuCoin) GetOrderBooks(assetPairs []types.AssetPair) map[types.AssetPair]*types.OrderBook {
+    channel := make(chan types.OrderBookResponse)
+    for _, assetPair := range assetPairs {
+        go k.getOrderBook(assetPair, channel)
+    }
+ 
+    orderBooks := make(map[types.AssetPair]*types.OrderBook)
+    for i := 0; i < len(assetPairs); i++ {
+        response := <- channel
+        orderBooks[response.AssetPair] = response.OrderBook
+    }
+    return orderBooks
+}
 
 func (k *KuCoin) GetLatency() time.Duration {
     start := time.Now()
 
     bodyJson := util.HttpGetAndGetBody(k.httpClient, RESTEndpoint + "/api/v1/timestamp")
-    CheckError(bodyJson)
+    checkError(bodyJson)
 
     duration := time.Since(start)
 
@@ -155,14 +156,14 @@ func (k *KuCoin) parseOrderType(ot types.OrderType) string {
     return "sell"
 }
 
-func (k *KuCoin) getKuCoinSignatureAndPassphrase(time, method, path, data string) (string, string) {
+func getKuCoinSignatureAndPassphrase(secretKey, apiPassphrase, time, method, path, data string) (string, string) {
     toSign := time + method + path + data
-    mac := hmac.New(sha256.New, []byte(k.secretKey))
+    mac := hmac.New(sha256.New, []byte(secretKey))
     mac.Write([]byte(toSign))
     signature := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
-    mac = hmac.New(sha256.New, []byte(k.secretKey))
-    mac.Write([]byte(k.apiPassphrase))
+    mac = hmac.New(sha256.New, []byte(secretKey))
+    mac.Write([]byte(apiPassphrase))
     passphrase := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
     return signature, passphrase
@@ -182,7 +183,7 @@ func (k *KuCoin) executeOrder(order types.Order, channel chan types.OrderIdRespo
 
     time := strconv.FormatInt(time.Now().UnixMilli(), 10)
 
-    signature, passphrase := k.getKuCoinSignatureAndPassphrase(time, "POST", "/api/v1/orders", string(data))
+    signature, passphrase := getKuCoinSignatureAndPassphrase(k.secretKey, k.apiPassphrase, time, "POST", "/api/v1/orders", string(data))
 
     request, err := http.NewRequest("POST", RESTEndpoint + "/api/v1/orders", bytes.NewReader(data))
     if err != nil {
@@ -195,7 +196,7 @@ func (k *KuCoin) executeOrder(order types.Order, channel chan types.OrderIdRespo
     request.Header.Set("KC-API-KEY-VERSION", "2")
 
     bodyJson := util.DoHttpAndGetBody(k.httpClient, request)
-    CheckError(bodyJson)
+    checkError(bodyJson)
 
     jsonData := bodyJson["data"].(map[string]interface{})
 
@@ -229,7 +230,7 @@ func (k *KuCoin) getOrderStatus(orderId types.OrderId, channel chan types.OrderS
     time := strconv.FormatInt(time.Now().UnixMilli(), 10)
     path := "/api/v1/orders/" + string(orderId)
 
-    signature, passphrase := k.getKuCoinSignatureAndPassphrase(time, "GET", path, "")
+    signature, passphrase := getKuCoinSignatureAndPassphrase(k.secretKey, k.apiPassphrase, time, "GET", path, "")
 
     request, err := http.NewRequest("GET", RESTEndpoint + path, nil)
     if err != nil {
@@ -242,7 +243,7 @@ func (k *KuCoin) getOrderStatus(orderId types.OrderId, channel chan types.OrderS
     request.Header.Set("KC-API-KEY-VERSION", "2")
 
     bodyJson := util.DoHttpAndGetBody(k.httpClient, request)
-    CheckError(bodyJson)
+    checkError(bodyJson)
 
     data := bodyJson["data"].(map[string]interface{})
 
@@ -293,7 +294,7 @@ func (k *KuCoin) cancelOrder(orderId types.OrderId) {
     time := strconv.FormatInt(time.Now().UnixMilli(), 10)
     path := "/api/v1/orders/" + string(orderId)
 
-    signature, passphrase := k.getKuCoinSignatureAndPassphrase(time, "DELETE", path, "")
+    signature, passphrase := getKuCoinSignatureAndPassphrase(k.secretKey, k.apiPassphrase, time, "DELETE", path, "")
 
     request, err := http.NewRequest("DELETE", RESTEndpoint + path, nil)
     if err != nil {
@@ -306,7 +307,7 @@ func (k *KuCoin) cancelOrder(orderId types.OrderId) {
     request.Header.Set("KC-API-KEY-VERSION", "2")
 
     bodyJson := util.DoHttpAndGetBody(k.httpClient, request)
-    CheckError(bodyJson)
+    checkError(bodyJson)
 
     k.orderIdToOrderTranslator.Delete(orderId)
 }
@@ -320,7 +321,7 @@ func (k *KuCoin) CancelOrders(orderIds []types.OrderId) {
 func (k *KuCoin) GetBalances() map[types.Asset]decimal.Decimal {
     time := strconv.FormatInt(time.Now().UnixMilli(), 10)
 
-    signature, passphrase := k.getKuCoinSignatureAndPassphrase(time, "GET", "/api/v1/accounts", "")
+    signature, passphrase := getKuCoinSignatureAndPassphrase(k.secretKey, k.apiPassphrase, time, "GET", "/api/v1/accounts", "")
 
     request, err := http.NewRequest("GET", RESTEndpoint + "/api/v1/accounts", nil)
     if err != nil {
@@ -333,7 +334,7 @@ func (k *KuCoin) GetBalances() map[types.Asset]decimal.Decimal {
     request.Header.Set("KC-API-KEY-VERSION", "2")
 
     bodyJson := util.DoHttpAndGetBody(k.httpClient, request)
-    CheckError(bodyJson)
+    checkError(bodyJson)
 
     data := bodyJson["data"].([]interface{})
 

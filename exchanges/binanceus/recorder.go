@@ -158,8 +158,8 @@ func (b *BinanceUSSpreadRecorder) RegisterAssetPair(assetPair types.AssetPair) {
     b.Lock()
     defer b.Unlock()
     b.webSocketConnection.WriteMessage(1, payloadJson)
-    var resp map[string]interface{}
     for {
+        var resp map[string]interface{}
         err := b.webSocketConnection.ReadJSON(&resp)
         if err != nil {
             log.Fatalln(err)
@@ -198,11 +198,6 @@ type BinanceUSOrderBookRecorder struct {
     orderBooks              *sync.Map
 }
 
-type concurrentOrderBookResponse struct {
-    assetPair           types.AssetPair
-    concurrentOrderBook *util.ConcurrentOrderBook
-}
-
 var SnapshotLimits [8]uint = [8]uint{
     5, 10, 20, 50, 100, 500, 1000, 5000,
 }
@@ -218,12 +213,12 @@ func selectLimit(depth uint) uint {
     return SnapshotLimits[i]
 }
 
-func getOrderBookSnapshot(httpClient *http.Client, assetPair types.AssetPair, assetPairTranslator types.AssetPairTranslator, limit uint, channel chan concurrentOrderBookResponse) {
+func getOrderBookSnapshot(httpClient *http.Client, assetPair types.AssetPair, assetPairTranslator types.AssetPairTranslator, limit uint, channel chan util.ConcurrentOrderBookResponse) {
     bodyJson := util.HttpGetAndGetBody(httpClient, util.ParseUrlWithQuery(RESTEndpoint + "/api/v3/depth", url.Values{
         "symbol": []string{assetPairTranslator[assetPair]},
         "limit": []string{strconv.FormatUint(uint64(limit), 10)},
     }))
-    CheckError(bodyJson)
+    checkError(bodyJson)
 
     lastUpdateId := uint(bodyJson["lastUpdateId"].(float64))
     asks := make([]types.OrderBookEntry, 0)
@@ -260,11 +255,11 @@ func getOrderBookSnapshot(httpClient *http.Client, assetPair types.AssetPair, as
     }
     concurrentOrderBook := util.NewConcurrentOrderBook(bids, asks)
 
-    channel <- concurrentOrderBookResponse{assetPair, concurrentOrderBook}
+    channel <- util.ConcurrentOrderBookResponse{assetPair, concurrentOrderBook}
 }
 
 func getOrderBookSnapshots(httpClient *http.Client, assetPairs []types.AssetPair, assetPairTranslator types.AssetPairTranslator, depth uint) (map[types.AssetPair]*util.ConcurrentOrderBook, *sync.Map) {
-    channel := make(chan concurrentOrderBookResponse)
+    channel := make(chan util.ConcurrentOrderBookResponse)
     for _, assetPair := range assetPairs {
         go getOrderBookSnapshot(httpClient, assetPair, assetPairTranslator, selectLimit(depth), channel)
     }
@@ -274,8 +269,8 @@ func getOrderBookSnapshots(httpClient *http.Client, assetPairs []types.AssetPair
     syncOrderBooks := &sync.Map{}
     for i := 0; i < len(assetPairs); i++ {
         response := <- channel
-        orderBooks[response.assetPair] = response.concurrentOrderBook
-        syncOrderBooks.Store(response.assetPair, response.concurrentOrderBook)
+        orderBooks[response.AssetPair] = response.ConcurrentOrderBook
+        syncOrderBooks.Store(response.AssetPair, response.ConcurrentOrderBook)
     }
     return orderBooks, syncOrderBooks
 }
@@ -367,20 +362,14 @@ func processOrderBookUpdates(httpClient *http.Client, assetPair types.AssetPair,
                 concurrentOrderBook.LastUpdateId = lastUpdateId
                 concurrentOrderBook.SetBidsAndAsks(bids[:util.MinUint(depth, uint(len(bids)))], asks[:util.MinUint(depth, uint(len(asks)))])
             } else {
-                channel := make(chan concurrentOrderBookResponse)
+                channel := make(chan util.ConcurrentOrderBookResponse)
                 go getOrderBookSnapshot(httpClient, assetPair, assetPairTranslator, selectLimit(depth), channel)
                 select {
                 case resp := <- channel:
-                    concurrentOrderBook.FilterAndMerge(resp.concurrentOrderBook, true)
+                    concurrentOrderBook.FilterAndMerge(resp.ConcurrentOrderBook, true)
                 }
             }
         }
-    }
-}
-
-func filterUpdateId(updateId uint) func(types.OrderBookEntry) bool {
-    return func(orderBookEntry types.OrderBookEntry) bool {
-        return orderBookEntry.UpdateId > updateId
     }
 }
 
@@ -410,8 +399,8 @@ func (b *BinanceUSOrderBookRecorder) RegisterAssetPair(assetPair types.AssetPair
     b.Lock()
     defer b.Unlock()
     b.webSocketConnection.WriteMessage(1, payloadJson)
-    var resp map[string]interface{}
     for {
+        var resp map[string]interface{}
         err := b.webSocketConnection.ReadJSON(&resp)
         if err != nil {
             log.Fatalln(err)
@@ -437,11 +426,11 @@ func (b *BinanceUSOrderBookRecorder) RegisterAssetPair(assetPair types.AssetPair
 
     b.channels.Store(streamName, channel)
 
-    snapshotChannel := make(chan concurrentOrderBookResponse)
+    snapshotChannel := make(chan util.ConcurrentOrderBookResponse)
     go getOrderBookSnapshot(b.httpClient, assetPair, b.assetPairTranslator, selectLimit(b.depth), snapshotChannel)
     select {
     case resp := <- snapshotChannel:
-        b.orderBooks.Store(assetPair, resp.concurrentOrderBook)
-        go processOrderBookUpdates(b.httpClient, assetPair, b.assetPairTranslator, resp.concurrentOrderBook, channel, b.depth)
+        b.orderBooks.Store(assetPair, resp.ConcurrentOrderBook)
+        go processOrderBookUpdates(b.httpClient, assetPair, b.assetPairTranslator, resp.ConcurrentOrderBook, channel, b.depth)
     }
 }
