@@ -59,6 +59,7 @@ func computeOrderCost(side []types.OrderBookEntry, amountToFill decimal.Decimal)
     return cumulativeCost
 }
 
+// use library?
 // based off RFC 2988 for estimating RTT
 type EwmaEstimator struct {
     estimate  float64

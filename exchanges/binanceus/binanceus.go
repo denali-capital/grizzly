@@ -143,7 +143,7 @@ func (b *BinanceUS) GetLatency() time.Duration {
     return time.Duration(b.latencyEstimator.GetEstimate()) * time.Millisecond
 }
 
-func (b *BinanceUS) parseOrderType(ot types.OrderType) string {
+func parseOrderType(ot types.OrderType) string {
     if (ot == types.Buy) {
         return "BUY"
     }
@@ -159,7 +159,7 @@ func (b *BinanceUS) getBinanceUSSignature(values url.Values) string {
 func (b *BinanceUS) executeOrder(order types.Order, channel chan types.OrderIdResponse) {
     queryParams := url.Values{
         "symbol": []string{b.AssetPairTranslator[order.AssetPair]},
-        "side": []string{b.parseOrderType(order.OrderType)},
+        "side": []string{parseOrderType(order.OrderType)},
         "type": []string{"LIMIT"},
         "timeInForce": []string{"GTC"},
         "price": []string{order.Price.String()},

@@ -149,7 +149,7 @@ func (k *KuCoin) GetLatency() time.Duration {
     return time.Duration(k.latencyEstimator.GetEstimate()) * time.Millisecond
 }
 
-func (k *KuCoin) parseOrderType(ot types.OrderType) string {
+func parseOrderType(ot types.OrderType) string {
     if (ot == types.Buy) {
         return "buy"
     }
@@ -172,7 +172,7 @@ func getKuCoinSignatureAndPassphrase(secretKey, apiPassphrase, time, method, pat
 func (k *KuCoin) executeOrder(order types.Order, channel chan types.OrderIdResponse) {
     data, err := json.Marshal(map[string]interface{}{
         "clientOid": uuid.NewString(),
-        "side": k.parseOrderType(order.OrderType),
+        "side": parseOrderType(order.OrderType),
         "symbol": k.AssetPairTranslator[order.AssetPair],
         "price": order.Price.String(),
         "size": order.Quantity.String(),

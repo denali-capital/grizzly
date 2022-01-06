@@ -52,7 +52,7 @@ func (k *Kraken) String() string {
     return "Kraken"
 }
 
-func (k *Kraken) checkError(bodyJson map[string]interface{}) {
+func checkError(bodyJson map[string]interface{}) {
     errors := bodyJson["error"].([]interface{})
     if len(errors) > 0 {
         log.Fatalln(errors)
@@ -94,7 +94,7 @@ func (k *Kraken) GetCurrentSpread(assetPair types.AssetPair) types.Spread {
     bodyJson := util.HttpGetAndGetBody(k.httpClient, util.ParseUrlWithQuery(RESTEndpoint + "/0/public/Ticker", url.Values{
         "pair": []string{k.AssetPairTranslator[assetPair]},
     }))
-    k.checkError(bodyJson)
+    checkError(bodyJson)
 
     data := bodyJson["result"].(map[string]interface{})[k.AssetPairTranslator[assetPair]].(map[string]interface{})
 
@@ -139,7 +139,7 @@ func (k *Kraken) GetLatency() time.Duration {
     start := time.Now()
 
     bodyJson := util.HttpGetAndGetBody(k.httpClient, RESTEndpoint + "/0/public/Time")
-    k.checkError(bodyJson)
+    checkError(bodyJson)
 
     duration := time.Since(start)
 
@@ -148,7 +148,7 @@ func (k *Kraken) GetLatency() time.Duration {
     return time.Duration(k.latencyEstimator.GetEstimate()) * time.Millisecond
 }
 
-func (k *Kraken) parseOrderType(ot types.OrderType) string {
+func parseOrderType(ot types.OrderType) string {
     if (ot == types.Buy) {
         return "buy"
     }
@@ -174,7 +174,7 @@ func (k *Kraken) getKrakenSignature(urlPath string, values url.Values) string {
 func (k *Kraken) executeOrder(order types.Order, channel chan types.OrderIdResponse) {
     queryParams := url.Values{
         "pair": []string{k.AssetPairTranslator[order.AssetPair]},
-        "type": []string{k.parseOrderType(order.OrderType)},
+        "type": []string{parseOrderType(order.OrderType)},
         "ordertype": []string{"limit"},
         "price": []string{order.Price.String()},
         "volume": []string{order.Quantity.String()},
@@ -190,7 +190,7 @@ func (k *Kraken) executeOrder(order types.Order, channel chan types.OrderIdRespo
     request.Header.Set("API-Key", k.apiKey)
 
     bodyJson := util.DoHttpAndGetBody(k.httpClient, request)
-    k.checkError(bodyJson)
+    checkError(bodyJson)
 
     data := bodyJson["result"].(map[string]interface{})["txid"].([]interface{})
     id := data[0].(string)
@@ -237,7 +237,7 @@ func (k *Kraken) GetOrderStatuses(orderIds []types.OrderId) map[types.OrderId]ty
     request.Header.Set("API-Key", k.apiKey)
 
     bodyJson := util.DoHttpAndGetBody(k.httpClient, request)
-    k.checkError(bodyJson)
+    checkError(bodyJson)
 
     data := bodyJson["result"].(map[types.OrderId]map[string]interface{})
     orderStatuses := make(map[types.OrderId]types.OrderStatus)
@@ -303,7 +303,7 @@ func (k *Kraken) CancelOrders(orderIds []types.OrderId) {
     request.Header.Set("API-Key", k.apiKey)
 
     bodyJson := util.DoHttpAndGetBody(k.httpClient, request)
-    k.checkError(bodyJson)
+    checkError(bodyJson)
 
     for _, orderId := range orderIds {
         k.orderIdToOrderTranslator.Delete(orderId)
@@ -324,7 +324,7 @@ func (k *Kraken) GetBalances() map[types.Asset]decimal.Decimal {
     request.Header.Set("API-Key", k.apiKey)
 
     bodyJson := util.DoHttpAndGetBody(k.httpClient, request)
-    k.checkError(bodyJson)
+    checkError(bodyJson)
 
     if _, ok := bodyJson["result"]; ok {
         data := bodyJson["result"].(map[types.Asset]string)
