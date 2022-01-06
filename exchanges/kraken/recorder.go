@@ -167,13 +167,13 @@ func processSpreadUpdates(historicalSpread *util.ConcurrentFixedSizeSpreadQueue,
                 log.Fatalln(err)
             }
             timestampInteger, timestampFraction := math.Modf(timestamp)
-            // fraction is in ns
-            timestampTime := time.Unix(int64(timestampInteger), int64(timestampFraction * 1000000))
+            
 
             historicalSpread.Push(types.Spread{
                 Bid: bid,
                 Ask: ask,
-                Timestamp: &timestampTime,
+                // fraction is in ns
+                Timestamp: time.Unix(int64(timestampInteger), int64(timestampFraction * 1000000)),
             })
         }
     }
@@ -185,6 +185,14 @@ func (k *KrakenSpreadRecorder) GetHistoricalSpreads(assetPair types.AssetPair) (
         return make([]types.Spread, 0), false
     }
     return result.(*util.ConcurrentFixedSizeSpreadQueue).Data(), true
+}
+
+func (k *KrakenSpreadRecorder) GetCurrentSpread(assetPair types.AssetPair) (types.Spread, bool) {
+    result, ok := k.historicalSpreads.Load(assetPair)
+    if !ok {
+        return types.Spread{}, false
+    }
+    return result.(*util.ConcurrentFixedSizeSpreadQueue).Back(), true
 }
 
 func (k *KrakenSpreadRecorder) RegisterAssetPair(assetPair types.AssetPair) {

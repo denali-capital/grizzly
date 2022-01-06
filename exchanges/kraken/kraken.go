@@ -91,26 +91,33 @@ func (k *Kraken) GetHistoricalSpreads(assetPairs []types.AssetPair, duration tim
 }
 
 func (k *Kraken) GetCurrentSpread(assetPair types.AssetPair) types.Spread {
-    bodyJson := util.HttpGetAndGetBody(k.httpClient, util.ParseUrlWithQuery(RESTEndpoint + "/0/public/Ticker", url.Values{
-        "pair": []string{k.AssetPairTranslator[assetPair]},
-    }))
-    checkError(bodyJson)
-
-    data := bodyJson["result"].(map[string]interface{})[k.AssetPairTranslator[assetPair]].(map[string]interface{})
-
-    bid, err := decimal.NewFromString(data["b"].([]interface{})[0].(string))
-    if err != nil {
-        log.Fatalln(err)
+    spread, ok := k.spreadRecorder.GetCurrentSpread(assetPair)
+    if !ok {
+        k.spreadRecorder.RegisterAssetPair(assetPair)
+        bodyJson := util.HttpGetAndGetBody(k.httpClient, util.ParseUrlWithQuery(RESTEndpoint + "/0/public/Ticker", url.Values{
+            "pair": []string{k.AssetPairTranslator[assetPair]},
+        }))
+        checkError(bodyJson)
+    
+        data := bodyJson["result"].(map[string]interface{})[k.AssetPairTranslator[assetPair]].(map[string]interface{})
+    
+        bid, err := decimal.NewFromString(data["b"].([]interface{})[0].(string))
+        if err != nil {
+            log.Fatalln(err)
+        }
+        ask, err := decimal.NewFromString(data["a"].([]interface{})[0].(string))
+        if err != nil {
+            log.Fatalln(err)
+        }
+    
+        return types.Spread{
+            Bid: bid,
+            Ask: ask,
+            Timestamp: time.Now(),
+        }
     }
-    ask, err := decimal.NewFromString(data["a"].([]interface{})[0].(string))
-    if err != nil {
-        log.Fatalln(err)
-    }
 
-    return types.Spread{
-        Bid: bid,
-        Ask: ask,
-    }
+    return spread
 }
 
 func (k *Kraken) getOrderBook(assetPair types.AssetPair, channel chan types.OrderBookResponse) {

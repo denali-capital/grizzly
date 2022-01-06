@@ -9,7 +9,7 @@ import (
 type Spread struct {
     Bid       decimal.Decimal
     Ask       decimal.Decimal
-    Timestamp *time.Time
+    Timestamp time.Time
 }
 
 type OrderType uint

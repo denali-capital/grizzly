@@ -93,25 +93,32 @@ func (k *KuCoin) GetHistoricalSpreads(assetPairs []types.AssetPair, duration tim
 }
 
 func (k *KuCoin) GetCurrentSpread(assetPair types.AssetPair) types.Spread {
-    bodyJson := util.HttpGetAndGetBody(k.httpClient, util.ParseUrlWithQuery(RESTEndpoint + "/api/v1/market/orderbook/level1", url.Values{
-        "symbol": []string{k.AssetPairTranslator[assetPair]},
-    }))
-    checkError(bodyJson)
+    spread, ok := k.spreadRecorder.GetCurrentSpread(assetPair)
+    if !ok {
+        k.spreadRecorder.RegisterAssetPair(assetPair)
+        bodyJson := util.HttpGetAndGetBody(k.httpClient, util.ParseUrlWithQuery(RESTEndpoint + "/api/v1/market/orderbook/level1", url.Values{
+            "symbol": []string{k.AssetPairTranslator[assetPair]},
+        }))
+        checkError(bodyJson)
+    
+        data := bodyJson["data"].(map[string]interface{})
+        bid, err := decimal.NewFromString(data["bestBid"].(string))
+        if err != nil {
+            log.Fatalln(err)
+        }
+        ask, err := decimal.NewFromString(data["bestAsk"].(string))
+        if err != nil {
+            log.Fatalln(err)
+        }
+    
+        return types.Spread{
+            Bid: bid,
+            Ask: ask,
+            Timestamp: time.Now(),
+        }
+    }
 
-    data := bodyJson["data"].(map[string]interface{})
-    bid, err := decimal.NewFromString(data["bestBid"].(string))
-    if err != nil {
-        log.Fatalln(err)
-    }
-    ask, err := decimal.NewFromString(data["bestAsk"].(string))
-    if err != nil {
-        log.Fatalln(err)
-    }
-
-    return types.Spread{
-        Bid: bid,
-        Ask: ask,
-    }
+    return spread
 }
 
 func (k *KuCoin) getOrderBook(assetPair types.AssetPair, channel chan types.OrderBookResponse) {

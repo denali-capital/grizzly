@@ -121,12 +121,11 @@ func processSpreadUpdates(historicalSpread *util.ConcurrentFixedSizeSpreadQueue,
             if err != nil {
                 log.Fatalln(err)
             }
-            timestamp := time.Now()
 
             historicalSpread.Push(types.Spread{
                 Bid: bid,
                 Ask: ask,
-                Timestamp: &timestamp,
+                Timestamp: time.Now(),
             })
         }
     }
@@ -138,6 +137,14 @@ func (b *BinanceUSSpreadRecorder) GetHistoricalSpreads(assetPair types.AssetPair
         return make([]types.Spread, 0), false
     }
     return result.(*util.ConcurrentFixedSizeSpreadQueue).Data(), true
+}
+
+func (b *BinanceUSSpreadRecorder) GetCurrentSpread(assetPair types.AssetPair) (types.Spread, bool) {
+    result, ok := b.historicalSpreads.Load(assetPair)
+    if !ok {
+        return types.Spread{}, false
+    }
+    return result.(*util.ConcurrentFixedSizeSpreadQueue).Back(), true
 }
 
 func (b *BinanceUSSpreadRecorder) RegisterAssetPair(assetPair types.AssetPair) {

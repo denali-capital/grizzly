@@ -207,12 +207,11 @@ func processSpreadUpdates(historicalSpread *util.ConcurrentFixedSizeSpreadQueue,
             if err != nil {
                 log.Fatalln(err)
             }
-            timestampTime := time.UnixMilli(int64(rawSpread["time"].(float64)))
 
             historicalSpread.Push(types.Spread{
                 Bid: bid,
                 Ask: ask,
-                Timestamp: &timestampTime,
+                Timestamp: time.UnixMilli(int64(rawSpread["time"].(float64))),
             })
         }
     }
@@ -224,6 +223,14 @@ func (k *KuCoinSpreadRecorder) GetHistoricalSpreads(assetPair types.AssetPair) (
         return make([]types.Spread, 0), false
     }
     return result.(*util.ConcurrentFixedSizeSpreadQueue).Data(), true
+}
+
+func (k *KuCoinSpreadRecorder) GetCurrentSpread(assetPair types.AssetPair) (types.Spread, bool) {
+    result, ok := k.historicalSpreads.Load(assetPair)
+    if !ok {
+        return types.Spread{}, false
+    }
+    return result.(*util.ConcurrentFixedSizeSpreadQueue).Back(), true
 }
 
 func (k *KuCoinSpreadRecorder) RegisterAssetPair(assetPair types.AssetPair) {

@@ -88,24 +88,31 @@ func (b *BinanceUS) GetHistoricalSpreads(assetPairs []types.AssetPair, duration 
 }
 
 func (b *BinanceUS) GetCurrentSpread(assetPair types.AssetPair) types.Spread {
-    bodyJson := util.HttpGetAndGetBody(b.httpClient, util.ParseUrlWithQuery(RESTEndpoint + "/api/v3/ticker/bookTicker", url.Values{
-        "symbol": []string{b.AssetPairTranslator[assetPair]},
-    }))
-    checkError(bodyJson)
+    spread, ok := b.spreadRecorder.GetCurrentSpread(assetPair)
+    if !ok {
+        b.spreadRecorder.RegisterAssetPair(assetPair)
+        bodyJson := util.HttpGetAndGetBody(b.httpClient, util.ParseUrlWithQuery(RESTEndpoint + "/api/v3/ticker/bookTicker", url.Values{
+            "symbol": []string{b.AssetPairTranslator[assetPair]},
+        }))
+        checkError(bodyJson)
 
-    bid, err := decimal.NewFromString(bodyJson["bidPrice"].(string))
-    if err != nil {
-        log.Fatalln(err)
-    }
-    ask, err := decimal.NewFromString(bodyJson["askPrice"].(string))
-    if err != nil {
-        log.Fatalln(err)
+        bid, err := decimal.NewFromString(bodyJson["bidPrice"].(string))
+        if err != nil {
+            log.Fatalln(err)
+        }
+        ask, err := decimal.NewFromString(bodyJson["askPrice"].(string))
+        if err != nil {
+            log.Fatalln(err)
+        }
+
+        return types.Spread{
+            Bid: bid,
+            Ask: ask,
+            Timestamp: time.Now(),
+        }
     }
 
-    return types.Spread{
-        Bid: bid,
-        Ask: ask,
-    }
+    return spread
 }
 
 func (b *BinanceUS) getOrderBook(assetPair types.AssetPair, channel chan types.OrderBookResponse) {

@@ -12,7 +12,7 @@ type Exchange interface {
 
     // * getting data
     GetHistoricalSpreads(assetPairs []AssetPair, duration time.Duration, samples uint) map[AssetPair][]Spread // WebSocket
-    GetCurrentSpread(assetPair AssetPair) Spread
+    GetCurrentSpread(assetPair AssetPair) Spread // Websocket
     GetOrderBooks(assetPairs []AssetPair) map[AssetPair]*OrderBook // WebSocket
     GetLatency() time.Duration
 
@@ -32,6 +32,7 @@ type AssetPairRecorder interface {
 
 type SpreadRecorder interface {
     AssetPairRecorder
+    GetCurrentSpread(assetPair AssetPair) (Spread, bool)
     GetHistoricalSpreads(assetPair AssetPair) ([]Spread, bool)
 }
 

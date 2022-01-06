@@ -72,6 +72,12 @@ func (c *ConcurrentFixedSizeSpreadQueue) Data() []types.Spread {
     return tmp
 }
 
+func (c *ConcurrentFixedSizeSpreadQueue) Back() types.Spread {
+    c.RLock()
+    defer c.RUnlock()
+    return c.internal[len(c.internal) - 1]
+}
+
 type ConcurrentOrderBook struct {
     sync.RWMutex
     internal     types.OrderBook
